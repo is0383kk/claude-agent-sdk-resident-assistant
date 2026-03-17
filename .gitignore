@@ -1,4 +1,5 @@
 CLAUDE.md
+.claude/settings.json
 .claude/settings.local.json
 openclaude.sock
 openclaude.pid

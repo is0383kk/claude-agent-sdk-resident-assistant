@@ -21,14 +21,17 @@ DEFAULT_SESSION_ID: str = "main"
 _projects_dir_name = str(BASE_DIR).replace("/", "-").replace(".", "-")
 CLAUDE_PROJECTS_DIR: Path = Path.home() / ".claude" / "projects" / _projects_dir_name
 
-# Webhook サーバー関連のファイルパス／デフォルトポート
+# Webhook サーバー関連のファイルパス（スタンドアロン起動時に使用）
 WEBHOOK_PID_FILE: Path = BASE_DIR / "webhook.pid"
-WEBHOOK_DEFAULT_PORT: int = 28789
+DEFAULT_PORT: int = 28789
 
 # Cron ジョブ関連のファイルパス
 CRON_DIR: Path = BASE_DIR / "cron"
 CRON_JOBS_FILE: Path = CRON_DIR / "jobs.json"
 CRON_RUNS_DIR: Path = CRON_DIR / "runs"
+
+# 設定ファイルパス
+CONFIG_FILE: Path = BASE_DIR / "config.json"
 
 
 # ---------------------------------------------------------------------------
