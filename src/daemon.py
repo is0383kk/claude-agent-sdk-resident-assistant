@@ -29,11 +29,11 @@ try:
         BASE_DIR,
         CLAUDE_PROJECTS_DIR,
         DAEMON_LOG,
+        DEFAULT_PORT,
         PID_FILE,
         SESSIONS_DIR,
         SESSIONS_JSON,
         SOCKET_PATH,
-        WEBHOOK_DEFAULT_PORT,
         setup_logging,
     )
     from .cron import CronScheduler
@@ -45,11 +45,11 @@ except ImportError:
         BASE_DIR,
         CLAUDE_PROJECTS_DIR,
         DAEMON_LOG,
+        DEFAULT_PORT,
         PID_FILE,
         SESSIONS_DIR,
         SESSIONS_JSON,
         SOCKET_PATH,
-        WEBHOOK_DEFAULT_PORT,
         setup_logging,
     )
     from src.cron import CronScheduler
@@ -565,7 +565,7 @@ class OpenClaudeDaemon:
 # ---------------------------------------------------------------------------
 
 
-def start_daemon_process(port: int = WEBHOOK_DEFAULT_PORT) -> None:
+def start_daemon_process(port: int = DEFAULT_PORT) -> None:
     """デーモンをデタッチされたバックグラウンドプロセスとして起動する。
 
     Args:
@@ -690,6 +690,6 @@ async def _main(port: int) -> None:
 
 if __name__ == "__main__":
     _parser = argparse.ArgumentParser(description="OpenClaude Daemon")
-    _parser.add_argument("--port", type=int, default=WEBHOOK_DEFAULT_PORT, metavar="PORT")
+    _parser.add_argument("--port", type=int, default=DEFAULT_PORT, metavar="PORT")
     _args = _parser.parse_args()
     asyncio.run(_main(_args.port))

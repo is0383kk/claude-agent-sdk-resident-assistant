@@ -35,9 +35,9 @@ _logger = logging.getLogger(__name__)
 # モジュール実行 (python3 -m src.api) とスクリプト実行の両方をサポート
 try:
     from .config import (
+        DEFAULT_PORT,
         DEFAULT_SESSION_ID,
         SOCKET_PATH,
-        WEBHOOK_DEFAULT_PORT,
         WEBHOOK_PID_FILE,
         setup_logging,
     )
@@ -46,9 +46,9 @@ except ImportError:
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
     from src.config import (
+        DEFAULT_PORT,
         DEFAULT_SESSION_ID,
         SOCKET_PATH,
-        WEBHOOK_DEFAULT_PORT,
         WEBHOOK_PID_FILE,
         setup_logging,
     )
@@ -509,6 +509,6 @@ async def _main(port: int) -> None:
 
 if __name__ == "__main__":
     _parser = argparse.ArgumentParser(description="OpenClaude API Server")
-    _parser.add_argument("--port", type=int, default=WEBHOOK_DEFAULT_PORT, metavar="PORT")
+    _parser.add_argument("--port", type=int, default=DEFAULT_PORT, metavar="PORT")
     _args = _parser.parse_args()
     asyncio.run(_main(_args.port))

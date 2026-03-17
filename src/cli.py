@@ -20,7 +20,9 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -28,7 +30,15 @@ from typing import Any, cast
 import argcomplete
 
 try:
-    from .config import CLAUDE_PROJECTS_DIR, DAEMON_LOG, DEFAULT_SESSION_ID, PID_FILE, SOCKET_PATH, WEBHOOK_DEFAULT_PORT
+    from .config import (
+        CLAUDE_PROJECTS_DIR,
+        CONFIG_FILE,
+        DAEMON_LOG,
+        DEFAULT_PORT,
+        DEFAULT_SESSION_ID,
+        PID_FILE,
+        SOCKET_PATH,
+    )
     from .daemon import get_daemon_status, start_daemon_process, stop_daemon_process
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
@@ -36,16 +46,72 @@ except ImportError:
         sys.path.insert(0, _pkg_root)
     from src.config import (
         CLAUDE_PROJECTS_DIR,
+        CONFIG_FILE,
         DAEMON_LOG,
+        DEFAULT_PORT,
         DEFAULT_SESSION_ID,
         PID_FILE,
         SOCKET_PATH,
-        WEBHOOK_DEFAULT_PORT,
     )
     from src.daemon import get_daemon_status, start_daemon_process, stop_daemon_process
 
 _CRAB = "🦀"
 _logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# 設定ファイルヘルパー
+# ---------------------------------------------------------------------------
+
+
+def _load_config() -> dict[str, Any]:
+    """config.json を読み込む。ファイルが存在しない場合は空 dict を返す。"""
+    try:
+        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        _logger.warning("Failed to load config: %s", e)
+    return {}
+
+
+def _save_config(data: dict[str, Any]) -> None:
+    """config.json にアトミックに書き込む。"""
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, str(CONFIG_FILE))
+    except Exception as e:
+        _logger.warning("Failed to save config: %s", e)
+
+
+def _config_get_nested(data: dict[str, Any], key: str) -> Any:
+    """ドット区切りキー (例: 'default.port') でネスト dict を読み取る。"""
+    parts = key.split(".")
+    cur: Any = data
+    for part in parts:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def _config_set_nested(data: dict[str, Any], key: str, value: Any) -> Any:
+    """ドット区切りキー (例: 'default.port') でネスト dict に値をセットする。セットした値を返す。"""
+    parts = key.split(".")
+    cur: dict[str, Any] = data
+    for part in parts[:-1]:
+        if part not in cur or not isinstance(cur[part], dict):
+            cur[part] = {}
+        cur = cur[part]
+    # 数値文字列は int に変換
+    actual = int(value) if isinstance(value, str) and value.isdigit() else value
+    cur[parts[-1]] = actual
+    return actual
 
 
 # ---------------------------------------------------------------------------
@@ -70,11 +136,11 @@ class OpenClaudeCLI:
         args = parser.parse_args()
 
         if args.command == "start":
-            self.cmd_start(getattr(args, "port", WEBHOOK_DEFAULT_PORT))
+            self.cmd_start(getattr(args, "port", DEFAULT_PORT))
         elif args.command == "stop":
             self.cmd_stop()
         elif args.command == "restart":
-            self.cmd_restart(getattr(args, "port", WEBHOOK_DEFAULT_PORT))
+            self.cmd_restart(getattr(args, "port", DEFAULT_PORT))
         elif args.command == "status":
             self.cmd_status()
         elif args.command == "logs":
@@ -98,6 +164,16 @@ class OpenClaudeCLI:
                 asyncio.run(self.cmd_cron_run(args.job_id))
             else:
                 parser.parse_args(["cron", "--help"])
+        elif args.command == "config":
+            config_cmd = getattr(args, "config_command", None)
+            if config_cmd == "set":
+                self.cmd_config_set(args.key, args.value)
+            elif config_cmd == "get":
+                self.cmd_config_get(args.key)
+            elif config_cmd == "show":
+                self.cmd_config_show()
+            else:
+                parser.parse_args(["config", "--help"])
         else:
             message = self._resolve_message(args.message)
             if message is not None:
@@ -112,22 +188,23 @@ class OpenClaudeCLI:
         )
 
         subparsers = parser.add_subparsers(dest="command")
+        _default_port = _config_get_nested(_load_config(), "default.port") or DEFAULT_PORT
         start_parser = subparsers.add_parser("start", help="Start the OpenClaude daemon")
         start_parser.add_argument(
             "--port",
             type=int,
-            default=WEBHOOK_DEFAULT_PORT,
+            default=_default_port,
             metavar="PORT",
-            help=f"Port for the API server (default: {WEBHOOK_DEFAULT_PORT})",
+            help=f"Port for the API server (default: {_default_port})",
         )
         subparsers.add_parser("stop", help="Stop the OpenClaude daemon")
         restart_parser = subparsers.add_parser("restart", help="Restart the OpenClaude daemon")
         restart_parser.add_argument(
             "--port",
             type=int,
-            default=WEBHOOK_DEFAULT_PORT,
+            default=_default_port,
             metavar="PORT",
-            help=f"Port for the API server (default: {WEBHOOK_DEFAULT_PORT})",
+            help=f"Port for the API server (default: {_default_port})",
         )
         subparsers.add_parser("status", help="Show daemon status")
         logs_parser = subparsers.add_parser("logs", help="Show daemon log")
@@ -163,6 +240,18 @@ class OpenClaudeCLI:
         cron_run_parser = cron_sub.add_parser("run", help="Manually trigger a cron job")
         cron_run_parser.add_argument("job_id", metavar="JOB_ID", help="Job ID to run")
 
+        config_parser = subparsers.add_parser("config", help="Manage persistent configuration")
+        config_sub = config_parser.add_subparsers(dest="config_command")
+
+        config_set_parser = config_sub.add_parser("set", help="Set a config value")
+        config_set_parser.add_argument("key", metavar="KEY", help="Config key in dot notation (e.g. default.port)")
+        config_set_parser.add_argument("value", metavar="VALUE", help="Value to set")
+
+        config_get_parser = config_sub.add_parser("get", help="Get a config value")
+        config_get_parser.add_argument("key", metavar="KEY", help="Config key in dot notation (e.g. default.port)")
+
+        config_sub.add_parser("show", help="Show all config values")
+
         # 会話モード
         parser.add_argument(
             "--session-id",
@@ -182,7 +271,7 @@ class OpenClaudeCLI:
     # ------------------------------------------------------------------
     # デーモン管理コマンド
     # ------------------------------------------------------------------
-    def cmd_start(self, port: int = WEBHOOK_DEFAULT_PORT) -> None:
+    def cmd_start(self, port: int = DEFAULT_PORT) -> None:
         """デーモンと API サーバーを起動する。既に起動済みの場合はメッセージを表示して終了する。"""
         status, pid = get_daemon_status()
         if status == "running":
@@ -231,7 +320,7 @@ class OpenClaudeCLI:
             print("ERROR: Failed to stop OpenClaude.", file=sys.stderr)
             sys.exit(1)
 
-    def cmd_restart(self, port: int = WEBHOOK_DEFAULT_PORT) -> None:
+    def cmd_restart(self, port: int = DEFAULT_PORT) -> None:
         """デーモンと API サーバーを再起動する。"""
         self.cmd_stop()
         time.sleep(0.5)
@@ -424,6 +513,34 @@ class OpenClaudeCLI:
             print(f"ERROR: {e}", file=sys.stderr)
             sys.exit(1)
 
+    # ------------------------------------------------------------------
+    # Config コマンド
+    # ------------------------------------------------------------------
+
+    def cmd_config_set(self, key: str, value: str) -> None:
+        """設定値をセットして config.json に保存する。"""
+        data = _load_config()
+        actual = _config_set_nested(data, key, value)
+        _save_config(data)
+        print(f"{key} = {actual!r}")
+
+    def cmd_config_get(self, key: str) -> None:
+        """設定値を取得して表示する。"""
+        data = _load_config()
+        value = _config_get_nested(data, key)
+        if value is None:
+            print(f"{key} is not set", file=sys.stderr)
+            sys.exit(1)
+        print(value)
+
+    def cmd_config_show(self) -> None:
+        """設定ファイルの全内容を表示する。"""
+        data = _load_config()
+        if not data:
+            print("(no config)")
+            return
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+
     async def _fetch_sessions(self) -> list[dict[str, Any]]:
         """デーモンに接続してセッション一覧を取得する。デーモン未起動時は空リストを返す。"""
         if not self._is_daemon_up():
@@ -446,7 +563,8 @@ class OpenClaudeCLI:
         # デーモンが起動していなければ自動起動
         if not self._is_daemon_up():
             print("Starting OpenClaude daemon...")
-            start_daemon_process()
+            _cfg_port = _config_get_nested(_load_config(), "default.port") or DEFAULT_PORT
+            start_daemon_process(_cfg_port)
             # ソケットが現れるまで待機
             for _ in range(150):
                 await asyncio.sleep(0.1)
