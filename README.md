@@ -60,6 +60,10 @@ pip install -r requirements.txt
 
 # Add to PATH (~/.bashrc)
 echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+
+# Enable tab completion (~/.bashrc)
+echo 'eval "$(register-python-argcomplete openclaude)"' >> ~/.bashrc
+
 source ~/.bashrc
 ```
 

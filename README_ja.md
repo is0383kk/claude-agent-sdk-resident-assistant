@@ -60,6 +60,10 @@ pip install -r requirements.txt
 
 # PATH に追加（~/.bashrc に追記）
 echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+
+# タブ補完を有効化（~/.bashrc に追記）
+echo 'eval "$(register-python-argcomplete openclaude)"' >> ~/.bashrc
+
 source ~/.bashrc
 ```
 
