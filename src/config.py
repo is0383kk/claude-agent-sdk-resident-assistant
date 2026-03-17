@@ -33,6 +33,9 @@ CRON_RUNS_DIR: Path = CRON_DIR / "runs"
 # 設定ファイルパス
 CONFIG_FILE: Path = BASE_DIR / "config.json"
 
+# Discord Bot 設定（環境変数フォールバック用）
+DISCORD_BOT_TOKEN_ENV: str = "DISCORD_BOT_TOKEN"  # noqa: S105
+
 
 # ---------------------------------------------------------------------------
 # ロギング設定

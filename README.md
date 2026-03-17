@@ -21,16 +21,17 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 
 ## Features
 
-| Feature                                | Command / Endpoint                                           |
-| -------------------------------------- | ------------------------------------------------------------ |
-| Daemon start / stop / restart / status | `openclaude start/stop/restart/status`                       |
-| Send message (streaming)               | `openclaude -m "message"`                                    |
-| stdin / pipe input                     | `echo "question" \| openclaude`                              |
-| View logs                              | `openclaude logs [--tail N]`                                 |
-| Session management                     | `openclaude sessions`                                        |
-| Cron job management                    | `openclaude cron add/list/delete/run`                        |
-| HTTP REST API                          | `POST /message`, `POST /message/stream`, `GET /status`, etc. |
-| Cron REST API                          | `GET /cron`, `POST /cron`, `DELETE /cron/{id}`, etc.         |
+| Feature                                | Command / Endpoint                                                   |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| Daemon start / stop / restart / status | `openclaude start/stop/restart/status`                               |
+| Send message (streaming)               | `openclaude -m "message"`                                            |
+| stdin / pipe input                     | `echo "question" \| openclaude`                                      |
+| View logs                              | `openclaude logs [--tail N]`                                         |
+| Session management                     | `openclaude sessions`                                                |
+| Cron job management                    | `openclaude cron add/list/delete/run`                                |
+| HTTP REST API                          | `POST /message`, `POST /message/stream`, `GET /status`, etc.         |
+| Cron REST API                          | `GET /cron`, `POST /cron`, `DELETE /cron/{id}`, etc.                 |
+| Discord integration                    | Auto-connect on daemon start (configure via `openclaude config set`) |
 
 ---
 
@@ -50,6 +51,7 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 | `fastapi>=0.115.0`         | REST API framework        |
 | `uvicorn>=0.30.0`          | ASGI server               |
 | `apscheduler>=3.10,<4`     | Cron job scheduler (v3.x) |
+| `discord.py>=2.3`          | Discord Bot (optional)    |
 
 ### Installation
 
@@ -141,6 +143,46 @@ openclaude cron run <job-id>
 openclaude cron delete <job-id>
 ```
 
+### Discord Integration
+
+Connect a Discord Bot to receive and reply to messages in a specified channel.
+
+**Prerequisites:**
+
+1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and obtain a Bot Token
+2. Enable **Message Content Intent** in the Bot settings
+3. Invite the Bot to your server via the OAuth2 URL
+
+**Setup:**
+
+```bash
+# Set Bot Token (required)
+openclaude config set discord.bot_token <YOUR_BOT_TOKEN>
+
+# Set target channel ID (required — right-click channel → Copy Channel ID)
+openclaude config set discord.channel_id <YOUR_CHANNEL_ID>
+
+# Set session to use (optional, default: "discord")
+openclaude config set discord.session_id discord2
+
+# Restart daemon to apply
+openclaude restart
+```
+
+> **Note:** If `discord.channel_id` is not set, the Bot will not start (a warning is logged).
+> Alternatively, set the token via the environment variable `DISCORD_BOT_TOKEN`.
+
+**Verify:**
+
+Check that the following messages appear in the logs:
+
+```
+Discord bot starting (channel_id=..., session=...)
+Discord bot ready (logged in as <BotName>)
+```
+
+Once running, any message sent to the configured channel will be forwarded to Claude and replied to by the Bot.
+
 ### systemd Integration (if configured)
 
 ```bash
@@ -188,11 +230,12 @@ Daemon + API server (same process)
 ```
 ~/.openclaude/
   ├── src/
-  │   ├── config.py    # File path constants and logging configuration
-  │   ├── daemon.py    # Unix socket server and message handlers
-  │   ├── api.py       # FastAPI REST API server
-  │   ├── cron.py      # Cron job management (CronJob / CronScheduler)
-  │   └── cli.py       # CLI entry point
+  │   ├── config.py        # File path constants and logging configuration
+  │   ├── daemon.py        # Unix socket server and message handlers
+  │   ├── api.py           # FastAPI REST API server
+  │   ├── cron.py          # Cron job management (CronJob / CronScheduler)
+  │   ├── discord_bot.py   # Discord Bot (optional)
+  │   └── cli.py           # CLI entry point
   ├── sessions/
   │   └── sessions.json         # Session alias -> SDK session ID mapping
   ├── cron/

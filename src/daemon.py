@@ -676,16 +676,24 @@ async def _main(port: int) -> None:
         def install_signal_handlers(self) -> None:
             pass  # daemon 側のシグナルハンドラーを維持するため何もしない
 
+    from .discord_bot import create_discord_bot  # noqa: PLC0415
+
     daemon = OpenClaudeDaemon()
     api_config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104
     api_server = _NoSignalServer(api_config)
+    discord_bot = create_discord_bot()
 
     async def _run_daemon() -> None:
         await daemon.start()
+        if discord_bot is not None:
+            await discord_bot.stop()
         api_server.should_exit = True  # daemon 停止後に API も停止
 
     _logger.info("OpenClaude API server will start on port %d", port)
-    await asyncio.gather(_run_daemon(), api_server.serve())
+    coros: list[Any] = [_run_daemon(), api_server.serve()]
+    if discord_bot is not None:
+        coros.append(discord_bot.start())
+    await asyncio.gather(*coros)
 
 
 if __name__ == "__main__":
