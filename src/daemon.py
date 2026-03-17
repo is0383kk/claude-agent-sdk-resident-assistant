@@ -191,7 +191,7 @@ class OpenClaudeDaemon:
 
         options = ClaudeAgentOptions(
             setting_sources=["project"],
-            permission_mode="bypassPermissions",
+            permission_mode="acceptEdits",
             cwd=str(BASE_DIR),
             include_partial_messages=True,
             resume=sdk_session_id,
@@ -463,7 +463,7 @@ class OpenClaudeDaemon:
 
         options = ClaudeAgentOptions(
             setting_sources=["project"],
-            permission_mode="bypassPermissions",
+            permission_mode="acceptEdits",
             cwd=str(BASE_DIR),
             include_partial_messages=True,
             resume=sdk_session_id,
@@ -628,7 +628,7 @@ def get_daemon_status() -> tuple[str, int | None]:
     """
     try:
         pid = int(PID_FILE.read_text(encoding="utf-8").strip())
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError, ValueError, OSError:
         return "stopped", None
 
     # プロセスが生存しているか確認
