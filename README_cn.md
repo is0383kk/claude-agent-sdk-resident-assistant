@@ -21,16 +21,17 @@
 
 ## 功能列表
 
-| 功能                        | 命令 / 端点                                               |
-| --------------------------- | --------------------------------------------------------- |
-| 守护进程启动/停止/重启/状态 | `openclaude start/stop/restart/status`                    |
-| 发送消息（流式传输）        | `openclaude -m "消息"`                                    |
-| stdin / 管道输入            | `echo "问题" \| openclaude`                               |
-| 查看日志                    | `openclaude logs [--tail N]`                              |
-| 会话管理                    | `openclaude sessions`                                     |
-| Cron 任务管理               | `openclaude cron add/list/delete/run`                     |
-| HTTP REST API               | `POST /message`, `POST /message/stream`, `GET /status` 等 |
-| Cron REST API               | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` 等         |
+| 功能                        | 命令 / 端点                                                 |
+| --------------------------- | ----------------------------------------------------------- |
+| 守护进程启动/停止/重启/状态 | `openclaude start/stop/restart/status`                      |
+| 发送消息（流式传输）        | `openclaude -m "消息"`                                      |
+| stdin / 管道输入            | `echo "问题" \| openclaude`                                 |
+| 查看日志                    | `openclaude logs [--tail N]`                                |
+| 会话管理                    | `openclaude sessions`                                       |
+| Cron 任务管理               | `openclaude cron add/list/delete/run`                       |
+| HTTP REST API               | `POST /message`, `POST /message/stream`, `GET /status` 等   |
+| Cron REST API               | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` 等           |
+| Discord 集成                | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
 
 ---
 
@@ -50,6 +51,7 @@
 | `fastapi>=0.115.0`         | REST API 框架           |
 | `uvicorn>=0.30.0`          | ASGI 服务器             |
 | `apscheduler>=3.10,<4`     | Cron 任务调度器（v3.x） |
+| `discord.py>=2.3`          | Discord Bot（可选）     |
 
 ### 安装步骤
 
@@ -141,6 +143,46 @@ openclaude cron run <job-id>
 openclaude cron delete <job-id>
 ```
 
+### Discord 集成
+
+连接 Discord Bot，接收指定频道的消息并自动回复。
+
+**前提条件：**
+
+1. 在 [Discord Developer Portal](https://discord.com/developers/applications) 创建应用并获取 Bot Token
+2. 在 Bot 设置中启用 **Message Content Intent**
+3. 通过 OAuth2 URL 将 Bot 邀请到服务器
+
+**配置步骤：**
+
+```bash
+# 设置 Bot Token（必填）
+openclaude config set discord.bot_token <YOUR_BOT_TOKEN>
+
+# 设置目标频道 ID（必填 — 右键点击频道 → 复制频道 ID）
+openclaude config set discord.channel_id <YOUR_CHANNEL_ID>
+
+# 更改使用的会话（可选，默认值："discord"）
+openclaude config set discord.session_id discord2
+
+# 重启守护进程以应用配置
+openclaude restart
+```
+
+> **注意：** 若未设置 `discord.channel_id`，Bot 将不会启动（日志中会输出 WARNING）。
+> Token 也可通过环境变量 `DISCORD_BOT_TOKEN` 设置。
+
+**验证运行：**
+
+日志中出现以下信息则表示正常启动：
+
+```
+Discord bot starting (channel_id=..., session=...)
+Discord bot ready (logged in as <BotName>)
+```
+
+启动后，发送到指定频道的消息将被转发至 Claude，并由 Bot 自动回复。
+
 ### systemd 集成（已配置的情况下）
 
 ```bash
@@ -188,11 +230,12 @@ CLI (openclaude)
 ```
 ~/.openclaude/
   ├── src/
-  │   ├── config.py    # 文件路径常量与日志配置
-  │   ├── daemon.py    # Unix 套接字服务器与消息处理器
-  │   ├── api.py       # FastAPI REST API 服务器
-  │   ├── cron.py      # Cron 任务管理（CronJob / CronScheduler）
-  │   └── cli.py       # CLI 入口点
+  │   ├── config.py        # 文件路径常量与日志配置
+  │   ├── daemon.py        # Unix 套接字服务器与消息处理器
+  │   ├── api.py           # FastAPI REST API 服务器
+  │   ├── cron.py          # Cron 任务管理（CronJob / CronScheduler）
+  │   ├── discord_bot.py   # Discord Bot（可选）
+  │   └── cli.py           # CLI 入口点
   ├── sessions/
   │   └── sessions.json         # 会话别名 → SDK 会话 ID 映射
   ├── cron/

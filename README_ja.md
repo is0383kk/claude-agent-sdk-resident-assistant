@@ -31,6 +31,7 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | Cron ジョブ管理                      | `openclaude cron add/list/delete/run`                       |
 | HTTP REST API                        | `POST /message`, `POST /message/stream`, `GET /status` など |
 | Cron REST API                        | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` など         |
+| Discord 連携                         | デーモン起動時に自動接続（`openclaude config set` で設定）  |
 
 ---
 
@@ -50,6 +51,7 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | `fastapi>=0.115.0`         | REST API フレームワーク         |
 | `uvicorn>=0.30.0`          | ASGI サーバー                   |
 | `apscheduler>=3.10,<4`     | Cron ジョブスケジューラ（v3.x） |
+| `discord.py>=2.3`          | Discord Bot（オプション）       |
 
 ### インストール
 
@@ -141,6 +143,46 @@ openclaude cron run <job-id>
 openclaude cron delete <job-id>
 ```
 
+### Discord 連携
+
+Discord Bot を接続して、指定チャンネルのメッセージを受信・返信できます。
+
+**前提:**
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) でアプリを作成し、Bot Token を取得
+2. Bot 設定で **Message Content Intent** を有効化
+3. OAuth2 URL でサーバーに Bot を招待
+
+**セットアップ:**
+
+```bash
+# Bot Token を設定（必須）
+openclaude config set discord.bot_token <YOUR_BOT_TOKEN>
+
+# 対象チャンネル ID を設定（必須 — チャンネルを右クリック → チャンネル ID をコピー）
+openclaude config set discord.channel_id <YOUR_CHANNEL_ID>
+
+# 使用するセッションを変更する場合（デフォルト: "discord"）
+openclaude config set discord.session_id discord2
+
+# デーモンを再起動して反映
+openclaude restart
+```
+
+> **注意:** `discord.channel_id` が未設定の場合、Bot は起動しません（WARNING ログが出ます）。
+> Token は環境変数 `DISCORD_BOT_TOKEN` でも設定できます。
+
+**動作確認:**
+
+以下のログが出ていれば正常に起動しています。
+
+```
+Discord bot starting (channel_id=..., session=...)
+Discord bot ready (logged in as <BotName>)
+```
+
+起動後は、設定したチャンネルに送信されたメッセージが Claude に転送され、Bot が返信します。
+
 ### systemd 連携（セットアップ済みの場合）
 
 ```bash
@@ -188,11 +230,12 @@ CLI (openclaude)
 ```
 ~/.openclaude/
   ├── src/
-  │   ├── config.py    # ファイルパス定数・ロギング設定
-  │   ├── daemon.py    # Unix ソケットサーバー・メッセージハンドラー
-  │   ├── api.py       # FastAPI REST API サーバー
-  │   ├── cron.py      # Cron ジョブ管理（CronJob / CronScheduler）
-  │   └── cli.py       # CLI エントリーポイント
+  │   ├── config.py        # ファイルパス定数・ロギング設定
+  │   ├── daemon.py        # Unix ソケットサーバー・メッセージハンドラー
+  │   ├── api.py           # FastAPI REST API サーバー
+  │   ├── cron.py          # Cron ジョブ管理（CronJob / CronScheduler）
+  │   ├── discord_bot.py   # Discord Bot（オプション）
+  │   └── cli.py           # CLI エントリーポイント
   ├── sessions/
   │   └── sessions.json         # セッションエイリアス → SDK セッション ID マッピング
   ├── cron/
