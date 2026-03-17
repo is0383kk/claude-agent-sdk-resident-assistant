@@ -57,6 +57,10 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 git clone <repository-url> ~/.openclaude
 cd ~/.openclaude
 pip install -r requirements.txt
+
+# Add to PATH (~/.bashrc)
+echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 > **Note:** The project must be placed in `~/.openclaude/`.

@@ -57,6 +57,10 @@
 git clone <repository-url> ~/.openclaude
 cd ~/.openclaude
 pip install -r requirements.txt
+
+# 添加至 PATH（追加至 ~/.bashrc）
+echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 > **注意：** 项目必须放置在 `~/.openclaude/` 目录下。

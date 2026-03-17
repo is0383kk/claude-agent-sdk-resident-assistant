@@ -57,6 +57,10 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 git clone <repository-url> ~/.openclaude
 cd ~/.openclaude
 pip install -r requirements.txt
+
+# PATH に追加（~/.bashrc に追記）
+echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 > **注意:** プロジェクトは必ず `~/.openclaude/` に配置してください。
