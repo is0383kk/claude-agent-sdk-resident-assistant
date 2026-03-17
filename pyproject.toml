@@ -9,32 +9,33 @@ dependencies = [
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
   "apscheduler>=3.10,<4",
+  "argcomplete>=3.0",
 ]
 
 [tool.ruff]
-extend-exclude = ["__pycache__"] # ディレクトリの除外設定
-target-version = "py311"         # Pythonの最小バージョンを指定する
-line-length = 120                # 行の最大長を120文字にする
-indent-width = 4                 # デフォルト値(PEP8準拠)だが明示する
+extend-exclude = ["__pycache__"]
+target-version = "py314"
+line-length = 120                # 行の最大長
+indent-width = 4
 
 [tool.ruff.format]
 docstring-code-format = true      # docstringのコードブロックをフォーマットする
-docstring-code-line-length = 120  # docstringの最大長を90文字にする
-indent-style = "space"            # デフォルト値(PEP8準拠)だが明示する
+docstring-code-line-length = 120  # docstringの最大長
+indent-style = "space"
 line-ending = "lf"                # 行末はLFにする
-quote-style = "double"            # デフォルト値(PEP8準拠)だが明示する
-skip-magic-trailing-comma = false # デフォルト値(PEP8準拠)だが明示する
+quote-style = "double"
+skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
-select = ["N", "E", "W", "D", "F", "I", "C90", "S", "TID", "ARG"] # ルールセット設定
+select = ["N", "E", "W", "D", "F", "I", "C90", "S", "TID", "ARG"]
 ignore = [
   "D400",   # docstringの末尾にピリオドを要求しない
   "D415",   # docstringの末尾にピリオドを要求しない
-  "TID252", # 相対インポートを許容する
+  "TID252", # 相対インポートを許容
 ]
-fixable = ["ALL"] # 修正可能なコードは全て修正する
+fixable = ["ALL"] # 修正可能なコードは全て修正
 unfixable = [] # 修正を無視するエラーコードリスト
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$" # _,__から始まる変数名を許容する
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$" # _,__から始まる変数名を許容
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = [
@@ -42,19 +43,19 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$" # _,__から始ま�
 ]
 
 [tool.ruff.lint.flake8-bandit]
-check-typed-exception = true # try-except-passを禁止する
+check-typed-exception = true # try-except-passを禁止
 
 [tool.ruff.lint.pycodestyle]
-max-doc-length = 120 # docstringの最大長を90文字にする
+max-doc-length = 120 # docstringの最大長
 
 [tool.ruff.lint.pydocstyle]
-convention = "google" # docstringはGoogle Python Style Guideに準拠する
+convention = "google"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15 # 循環的複雑度の上限を15にする
+max-complexity = 15 # 循環的複雑度
 
 [tool.ruff.lint.isort]
-case-sensitive = true # インポート順は大文字小文字を区別する
+case-sensitive = true # インポート順は大文字小文字を区別
 
 [tool.mypy]
 show_error_context = true

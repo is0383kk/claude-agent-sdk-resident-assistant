@@ -25,6 +25,8 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+import argcomplete
+
 try:
     from .config import CLAUDE_PROJECTS_DIR, DAEMON_LOG, DEFAULT_SESSION_ID, PID_FILE, SOCKET_PATH, WEBHOOK_DEFAULT_PORT
     from .daemon import get_daemon_status, start_daemon_process, stop_daemon_process
@@ -64,6 +66,7 @@ class OpenClaudeCLI:
     def run(self) -> None:
         """引数を解析して対応するコマンドを実行する。"""
         parser = self._build_parser()
+        argcomplete.autocomplete(parser)
         args = parser.parse_args()
 
         if args.command == "start":
