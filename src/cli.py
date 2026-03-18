@@ -18,6 +18,7 @@
 
 import argparse
 import asyncio
+import collections
 import json
 import logging
 import os
@@ -306,6 +307,11 @@ class OpenClaudeCLI:
         if status == "stopped":
             print("OpenClaude is not running.")
             return
+        if status == "stale":
+            PID_FILE.unlink(missing_ok=True)
+            SOCKET_PATH.unlink(missing_ok=True)
+            print("OpenClaude stopped (cleaned up stale state).")
+            return
 
         print("Stopping OpenClaude daemon...")
         ok = stop_daemon_process()
@@ -342,10 +348,12 @@ class OpenClaudeCLI:
             print("No log file found.", file=sys.stderr)
             return
 
-        lines = DAEMON_LOG.read_text(encoding="utf-8").splitlines()
         if tail is not None:
-            lines = lines[-tail:]
-        print("\n".join(lines))
+            with DAEMON_LOG.open(encoding="utf-8") as f:
+                lines = list(collections.deque(f, maxlen=tail))
+            print("".join(lines), end="")
+        else:
+            print(DAEMON_LOG.read_text(encoding="utf-8"), end="")
 
     # ------------------------------------------------------------------
     # セッションコマンド

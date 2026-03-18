@@ -546,7 +546,6 @@ class OpenClaudeDaemon:
     def _save_sessions(self) -> None:
         """self._sessions を sessions.json にアトミックに書き込む。"""
         try:
-            SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=str(SESSIONS_DIR), suffix=".tmp")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(self._sessions, f, ensure_ascii=False)

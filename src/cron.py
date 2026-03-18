@@ -255,7 +255,6 @@ class CronScheduler:
     def _save_jobs(self) -> None:
         """self._jobs を jobs.json にアトミックに書き込む。"""
         try:
-            CRON_DIR.mkdir(parents=True, exist_ok=True)
             data = [asdict(job) for job in self._jobs.values()]
             fd, tmp = tempfile.mkstemp(dir=str(CRON_DIR), suffix=".tmp")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
