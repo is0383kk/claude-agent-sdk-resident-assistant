@@ -21,9 +21,7 @@ import asyncio
 import collections
 import json
 import logging
-import os
 import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -33,7 +31,6 @@ import argcomplete
 try:
     from .config import (
         CLAUDE_PROJECTS_DIR,
-        CONFIG_FILE,
         DAEMON_LOG,
         DEFAULT_PORT,
         DEFAULT_SESSION_ID,
@@ -41,13 +38,13 @@ try:
         SOCKET_PATH,
     )
     from .daemon import get_daemon_status, start_daemon_process, stop_daemon_process
+    from .utils import daemon_request, load_config, save_config
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
     from src.config import (
         CLAUDE_PROJECTS_DIR,
-        CONFIG_FILE,
         DAEMON_LOG,
         DEFAULT_PORT,
         DEFAULT_SESSION_ID,
@@ -55,6 +52,7 @@ except ImportError:
         SOCKET_PATH,
     )
     from src.daemon import get_daemon_status, start_daemon_process, stop_daemon_process
+    from src.utils import daemon_request, load_config, save_config
 
 _CRAB = "🦀"
 _logger = logging.getLogger(__name__)
@@ -63,31 +61,6 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # 設定ファイルヘルパー
 # ---------------------------------------------------------------------------
-
-
-def _load_config() -> dict[str, Any]:
-    """config.json を読み込む。ファイルが存在しない場合は空 dict を返す。"""
-    try:
-        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return data
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        _logger.warning("Failed to load config: %s", e)
-    return {}
-
-
-def _save_config(data: dict[str, Any]) -> None:
-    """config.json にアトミックに書き込む。"""
-    try:
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, str(CONFIG_FILE))
-    except Exception as e:
-        _logger.warning("Failed to save config: %s", e)
 
 
 def _config_get_nested(data: dict[str, Any], key: str) -> Any:
@@ -189,7 +162,7 @@ class OpenClaudeCLI:
         )
 
         subparsers = parser.add_subparsers(dest="command")
-        _default_port = _config_get_nested(_load_config(), "default.port") or DEFAULT_PORT
+        _default_port = _config_get_nested(load_config(), "default.port") or DEFAULT_PORT
         start_parser = subparsers.add_parser("start", help="Start the OpenClaude daemon")
         start_parser.add_argument(
             "--port",
@@ -390,7 +363,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request({"type": "cleanup_sessions"})
+            response = await daemon_request({"type": "cleanup_sessions"})
             if response.get("type") == "cleanup_done":
                 count = response.get("deleted_count", 0)
                 print(f"Cleaned up {count} session(s).")
@@ -410,7 +383,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request({"type": "delete_session", "session_id": session_id})
+            response = await daemon_request({"type": "delete_session", "session_id": session_id})
             if response.get("type") == "delete_done":
                 print(f"Deleted session: {session_id}")
                 if response.get("failed"):
@@ -433,7 +406,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request(
+            response = await daemon_request(
                 {"type": "cron_add", "name": name, "schedule": schedule, "session_id": session, "message": message}
             )
             if response.get("type") == "cron_added":
@@ -455,7 +428,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request({"type": "cron_list"})
+            response = await daemon_request({"type": "cron_list"})
             if response.get("type") == "error":
                 print(f"ERROR: {response.get('message')}", file=sys.stderr)
                 sys.exit(1)
@@ -494,7 +467,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request({"type": "cron_delete", "job_id": job_id})
+            response = await daemon_request({"type": "cron_delete", "job_id": job_id})
             if response.get("type") == "cron_deleted":
                 print(f"Deleted cron job: {job_id}")
             elif response.get("type") == "error":
@@ -511,7 +484,7 @@ class OpenClaudeCLI:
             return
 
         try:
-            response = await self._daemon_request({"type": "cron_run", "job_id": job_id})
+            response = await daemon_request({"type": "cron_run", "job_id": job_id})
             if response.get("type") == "cron_run_started":
                 print(f"Cron job started: {job_id}")
             elif response.get("type") == "error":
@@ -527,14 +500,14 @@ class OpenClaudeCLI:
 
     def cmd_config_set(self, key: str, value: str) -> None:
         """設定値をセットして config.json に保存する。"""
-        data = _load_config()
+        data = load_config()
         actual = _config_set_nested(data, key, value)
-        _save_config(data)
+        save_config(data)
         print(f"{key} = {actual!r}")
 
     def cmd_config_get(self, key: str) -> None:
         """設定値を取得して表示する。"""
-        data = _load_config()
+        data = load_config()
         value = _config_get_nested(data, key)
         if value is None:
             print(f"{key} is not set", file=sys.stderr)
@@ -543,7 +516,7 @@ class OpenClaudeCLI:
 
     def cmd_config_show(self) -> None:
         """設定ファイルの全内容を表示する。"""
-        data = _load_config()
+        data = load_config()
         if not data:
             print("(no config)")
             return
@@ -555,7 +528,7 @@ class OpenClaudeCLI:
             return []
 
         try:
-            response = await self._daemon_request({"type": "sessions"})
+            response = await daemon_request({"type": "sessions"})
             if response.get("type") == "sessions_list":
                 return cast(list[dict[str, Any]], response.get("sessions", []))
             return []
@@ -571,7 +544,7 @@ class OpenClaudeCLI:
         # デーモンが起動していなければ自動起動
         if not self._is_daemon_up():
             print("Starting OpenClaude daemon...")
-            _cfg_port = _config_get_nested(_load_config(), "default.port") or DEFAULT_PORT
+            _cfg_port = _config_get_nested(load_config(), "default.port") or DEFAULT_PORT
             start_daemon_process(_cfg_port)
             # ソケットが現れるまで待機
             for _ in range(150):
@@ -651,17 +624,6 @@ class OpenClaudeCLI:
     def _is_daemon_up(self) -> bool:
         status, _ = get_daemon_status()
         return status == "running"
-
-    async def _daemon_request(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Unix ソケット経由でデーモンに JSON リクエストを送信し、単一レスポンスを返す。"""
-        reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
-        try:
-            writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
-            await writer.drain()
-            return await self._read_json(reader)
-        finally:
-            writer.close()
-            await writer.wait_closed()
 
     async def _read_json(self, reader: asyncio.StreamReader) -> dict[str, Any]:
         line = await reader.readline()

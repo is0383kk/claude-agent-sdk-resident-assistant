@@ -4,12 +4,12 @@ import asyncio
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 import discord
 
-from .config import CONFIG_FILE, DISCORD_BOT_TOKEN_ENV, SOCKET_PATH
+from .config import DISCORD_BOT_TOKEN_ENV, SOCKET_PATH
+from .utils import load_config
 
 _logger = logging.getLogger(__name__)
 
@@ -133,14 +133,8 @@ class DiscordBot:
 
 def _load_discord_config() -> dict[str, Any]:
     """config.json から discord セクションを読み込む。失敗時は空 dict を返す。"""
-    try:
-        data = json.loads(Path(CONFIG_FILE).read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            section = data.get("discord", {})
-            return section if isinstance(section, dict) else {}
-        return {}
-    except Exception:  # noqa: BLE001
-        return {}
+    section = load_config().get("discord", {})
+    return section if isinstance(section, dict) else {}
 
 
 def create_discord_bot() -> "DiscordBot | None":
@@ -166,7 +160,7 @@ def create_discord_bot() -> "DiscordBot | None":
         return None
     try:
         channel_id = int(raw_channel_id)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         _logger.warning("Discord bot disabled: discord.channel_id is invalid: %r", raw_channel_id)
         return None
 

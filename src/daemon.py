@@ -16,7 +16,6 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -37,6 +36,7 @@ try:
         setup_logging,
     )
     from .cron import CronScheduler
+    from .utils import atomic_write_json
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
     if _pkg_root not in sys.path:
@@ -53,6 +53,7 @@ except ImportError:
         setup_logging,
     )
     from src.cron import CronScheduler
+    from src.utils import atomic_write_json
 
 
 # ---------------------------------------------------------------------------
@@ -546,10 +547,7 @@ class OpenClaudeDaemon:
     def _save_sessions(self) -> None:
         """self._sessions を sessions.json にアトミックに書き込む。"""
         try:
-            fd, tmp = tempfile.mkstemp(dir=str(SESSIONS_DIR), suffix=".tmp")
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(self._sessions, f, ensure_ascii=False)
-            os.replace(tmp, str(SESSIONS_JSON))
+            atomic_write_json(SESSIONS_JSON, self._sessions, dir_path=SESSIONS_DIR)
         except Exception as e:
             _logger.warning("Failed to save sessions: %s", e)
 
