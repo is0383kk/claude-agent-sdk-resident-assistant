@@ -65,23 +65,24 @@ class _DiscordClient(discord.Client):
 
         chunks: list[str] = []
         error_msg: str | None = None
-        try:
-            payload = {"type": "query", "session_id": self._session_id, "message": message.content}
-            writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
-            await writer.drain()
+        async with message.channel.typing():  # type: ignore[union-attr]
+            try:
+                payload = {"type": "query", "session_id": self._session_id, "message": message.content}
+                writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
+                await writer.drain()
 
-            async for line in reader:
-                resp = json.loads(line)
-                if resp["type"] == "chunk":
-                    chunks.append(resp["text"])
-                elif resp["type"] == "done":
-                    break
-                elif resp["type"] == "error":
-                    error_msg = resp.get("message", "unknown error")
-                    break
-        finally:
-            writer.close()
-            await writer.wait_closed()
+                async for line in reader:
+                    resp = json.loads(line)
+                    if resp["type"] == "chunk":
+                        chunks.append(resp["text"])
+                    elif resp["type"] == "done":
+                        break
+                    elif resp["type"] == "error":
+                        error_msg = resp.get("message", "unknown error")
+                        break
+            finally:
+                writer.close()
+                await writer.wait_closed()
 
         if error_msg is not None:
             await _send_long_message(
