@@ -7,9 +7,7 @@ CronJob データクラスとスケジューラを提供する。
 import asyncio
 import json
 import logging
-import os
 import secrets
-import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -23,6 +21,7 @@ _logger = logging.getLogger(__name__)
 
 try:
     from .config import CRON_DIR, CRON_JOBS_FILE, CRON_RUNS_DIR
+    from .utils import atomic_write_json
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
     import sys
@@ -30,6 +29,7 @@ except ImportError:
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
     from src.config import CRON_DIR, CRON_JOBS_FILE, CRON_RUNS_DIR
+    from src.utils import atomic_write_json
 
 
 # ---------------------------------------------------------------------------
@@ -255,11 +255,7 @@ class CronScheduler:
     def _save_jobs(self) -> None:
         """self._jobs を jobs.json にアトミックに書き込む。"""
         try:
-            data = [asdict(job) for job in self._jobs.values()]
-            fd, tmp = tempfile.mkstemp(dir=str(CRON_DIR), suffix=".tmp")
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False)
-            os.replace(tmp, str(CRON_JOBS_FILE))
+            atomic_write_json(CRON_JOBS_FILE, [asdict(job) for job in self._jobs.values()], dir_path=CRON_DIR)
         except Exception as e:
             _logger.warning("cron_save: failed to save jobs: %s", e)
 

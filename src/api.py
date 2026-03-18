@@ -41,6 +41,7 @@ try:
         WEBHOOK_PID_FILE,
         setup_logging,
     )
+    from .utils import daemon_request
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
     if _pkg_root not in sys.path:
@@ -52,6 +53,7 @@ except ImportError:
         WEBHOOK_PID_FILE,
         setup_logging,
     )
+    from src.utils import daemon_request
 
 
 # ---------------------------------------------------------------------------
@@ -174,20 +176,12 @@ async def _request_daemon(payload: dict[str, Any]) -> dict[str, Any]:
         HTTPException: デーモンが起動していない場合（503）。
     """
     try:
-        reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
+        resp = await daemon_request(payload)
     except (FileNotFoundError, ConnectionRefusedError) as e:
         raise HTTPException(status_code=503, detail=f"Daemon is not running: {e}") from e
-
-    try:
-        writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
-        await writer.drain()
-        line = await reader.readline()
-        if not line:
-            raise HTTPException(status_code=503, detail="Empty response from daemon")
-        return json.loads(line.decode("utf-8").strip())  # type: ignore[no-any-return]
-    finally:
-        writer.close()
-        await writer.wait_closed()
+    if not resp:
+        raise HTTPException(status_code=503, detail="Empty response from daemon")
+    return resp
 
 
 # ---------------------------------------------------------------------------
