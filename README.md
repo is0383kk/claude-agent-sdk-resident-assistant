@@ -32,6 +32,7 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 | HTTP REST API                          | `POST /message`, `POST /message/stream`, `GET /status`, etc.         |
 | Cron REST API                          | `GET /cron`, `POST /cron`, `DELETE /cron/{id}`, etc.                 |
 | Discord integration                    | Auto-connect on daemon start (configure via `openclaude config set`) |
+| Slack integration                      | Auto-connect on daemon start (configure via `openclaude config set`) |
 
 ---
 
@@ -52,6 +53,7 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 | `uvicorn>=0.30.0`          | ASGI server               |
 | `apscheduler>=3.10,<4`     | Cron job scheduler (v3.x) |
 | `discord.py>=2.3`          | Discord Bot (optional)    |
+| `slack-bolt>=1.18`         | Slack Bot (optional)      |
 
 ### Installation
 
@@ -183,6 +185,60 @@ Discord bot ready (logged in as <BotName>)
 
 Once running, any message sent to the configured channel will be forwarded to Claude and replied to by the Bot.
 
+### Slack Integration
+
+Connect a Slack Bot to receive and reply to DMs and channel mentions via Socket Mode.
+
+**Prerequisites:**
+
+1. Create an application in the [Slack API Portal](https://api.slack.com/apps) and install it to your workspace
+2. Enable **Socket Mode** and obtain an App-Level Token (`xapp-` prefix) with the `connections:write` scope
+3. Add the following Bot Token Scopes: `chat:write`, `reactions:write`, `channels:history`, `im:history`, `app_mentions:read`
+4. Enable the **Event Subscriptions** and subscribe to `message.im` and `app_mention` bot events
+5. Obtain the Bot Token (`xoxb-` prefix) from the **Install App** page
+
+**Setup:**
+
+```bash
+# Set Bot Token (required, xoxb- prefix)
+openclaude config set slack.bot_token <YOUR_BOT_TOKEN>
+
+# Set App Token (required, xapp- prefix)
+openclaude config set slack.app_token <YOUR_APP_TOKEN>
+
+# Set session to use (optional, default: "slack")
+openclaude config set slack.session_id slack2
+
+# Restart daemon to apply
+openclaude restart
+```
+
+> **Note:** Both `slack.bot_token` and `slack.app_token` must be set for the Bot to start.
+> Tokens can also be set via environment variables `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.
+
+**Advanced options:**
+
+```bash
+# Restrict DMs to specific users (default: "open" — allow all)
+openclaude config set slack.dm_policy allowlist
+openclaude config set slack.allow_from '["U01234567", "U09876543"]'
+
+# Restrict channel mentions to specific channels (default: "open" — allow all)
+openclaude config set slack.channel_policy allowlist
+openclaude config set slack.channels '["C01234567"]'
+```
+
+**Verify:**
+
+Check that the following messages appear in the logs:
+
+```
+Slack bot starting (session=...)
+Slack bot ready (logged in as <BotName>, team=<TeamName>)
+```
+
+Once running, DMs to the Bot and `@mentions` in channels will be forwarded to Claude and replied to by the Bot.
+
 ### systemd Integration (if configured)
 
 ```bash
@@ -219,10 +275,12 @@ CLI (openclaude)
   └── src/cli.py
         └── Communicates with daemon via Unix socket (~/.openclaude/openclaude.sock)
 
-Daemon + API server (same process)
-  ├── src/daemon.py  ── Unix socket server
-  ├── src/api.py     ── FastAPI + uvicorn (REST API)
-  └── src/cron.py    ── apscheduler-based scheduler
+Daemon + API server + Discord Bot + Slack Bot (same process)
+  ├── src/daemon.py      ── Unix socket server
+  ├── src/api.py         ── FastAPI + uvicorn (REST API)
+  ├── src/cron.py        ── apscheduler-based scheduler
+  ├── src/discord_bot.py ── Discord Bot (optional)
+  └── src/slack_bot.py   ── Slack Bot (optional)
 ```
 
 ### File Structure
@@ -235,6 +293,8 @@ Daemon + API server (same process)
   │   ├── api.py           # FastAPI REST API server
   │   ├── cron.py          # Cron job management (CronJob / CronScheduler)
   │   ├── discord_bot.py   # Discord Bot (optional)
+  │   ├── slack_bot.py     # Slack Bot (optional)
+  │   ├── utils.py         # Shared utilities (config loading, etc.)
   │   └── cli.py           # CLI entry point
   ├── sessions/
   │   └── sessions.json         # Session alias -> SDK session ID mapping

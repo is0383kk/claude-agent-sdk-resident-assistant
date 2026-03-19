@@ -625,7 +625,7 @@ def get_daemon_status() -> tuple[str, int | None]:
     """
     try:
         pid = int(PID_FILE.read_text(encoding="utf-8").strip())
-    except FileNotFoundError, ValueError, OSError:
+    except (FileNotFoundError, ValueError, OSError):
         return "stopped", None
 
     # プロセスが生存しているか確認
@@ -674,22 +674,28 @@ async def _main(port: int) -> None:
             pass  # daemon 側のシグナルハンドラーを維持するため何もしない
 
     from .discord_bot import create_discord_bot  # noqa: PLC0415
+    from .slack_bot import create_slack_bot  # noqa: PLC0415
 
     daemon = OpenClaudeDaemon()
     api_config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104
     api_server = _NoSignalServer(api_config)
     discord_bot = create_discord_bot()
+    slack_bot = create_slack_bot()
 
     async def _run_daemon() -> None:
         await daemon.start()
         if discord_bot is not None:
             await discord_bot.stop()
+        if slack_bot is not None:
+            await slack_bot.stop()
         api_server.should_exit = True  # daemon 停止後に API も停止
 
     _logger.info("OpenClaude API server will start on port %d", port)
     coros: list[Any] = [_run_daemon(), api_server.serve()]
     if discord_bot is not None:
         coros.append(discord_bot.start())
+    if slack_bot is not None:
+        coros.append(slack_bot.start())
     await asyncio.gather(*coros)
 
 
