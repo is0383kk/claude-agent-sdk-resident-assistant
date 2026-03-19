@@ -11,11 +11,12 @@ dependencies = [
   "apscheduler>=3.10,<4",
   "argcomplete>=3.0",
   "discord.py>=2.3",
+  "slack-bolt>=1.18",
 ]
 
 [tool.ruff]
 extend-exclude = ["__pycache__"]
-target-version = "py314"
+target-version = "py313"
 line-length = 120                # 行の最大長
 indent-width = 4
 

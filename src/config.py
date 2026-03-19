@@ -36,6 +36,10 @@ CONFIG_FILE: Path = BASE_DIR / "config.json"
 # Discord Bot 設定（環境変数フォールバック用）
 DISCORD_BOT_TOKEN_ENV: str = "DISCORD_BOT_TOKEN"  # noqa: S105
 
+# Slack Bot 設定（環境変数フォールバック用）
+SLACK_BOT_TOKEN_ENV: str = "SLACK_BOT_TOKEN"  # noqa: S105
+SLACK_APP_TOKEN_ENV: str = "SLACK_APP_TOKEN"  # noqa: S105
+
 
 # ---------------------------------------------------------------------------
 # ロギング設定

@@ -32,6 +32,7 @@
 | HTTP REST API               | `POST /message`, `POST /message/stream`, `GET /status` 等   |
 | Cron REST API               | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` 等           |
 | Discord 集成                | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
+| Slack 集成                  | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
 
 ---
 
@@ -52,6 +53,7 @@
 | `uvicorn>=0.30.0`          | ASGI 服务器             |
 | `apscheduler>=3.10,<4`     | Cron 任务调度器（v3.x） |
 | `discord.py>=2.3`          | Discord Bot（可选）     |
+| `slack-bolt>=1.18`         | Slack Bot（可选）       |
 
 ### 安装步骤
 
@@ -183,6 +185,60 @@ Discord bot ready (logged in as <BotName>)
 
 启动后，发送到指定频道的消息将被转发至 Claude，并由 Bot 自动回复。
 
+### Slack 集成
+
+通过 Socket Mode 连接 Slack Bot，接收私信和频道 @提及 并自动回复。
+
+**前提条件：**
+
+1. 在 [Slack API Portal](https://api.slack.com/apps) 创建应用并安装至工作区
+2. 启用 **Socket Mode**，获取具有 `connections:write` 权限范围的 App-Level Token（`xapp-` 前缀）
+3. 为 Bot Token 添加以下权限范围：`chat:write`, `reactions:write`, `channels:history`, `im:history`, `app_mentions:read`
+4. 启用 **Event Subscriptions** 并订阅 `message.im` 和 `app_mention` Bot 事件
+5. 从 **Install App** 页面获取 Bot Token（`xoxb-` 前缀）
+
+**配置步骤：**
+
+```bash
+# 设置 Bot Token（必填，xoxb- 前缀）
+openclaude config set slack.bot_token <YOUR_BOT_TOKEN>
+
+# 设置 App Token（必填，xapp- 前缀）
+openclaude config set slack.app_token <YOUR_APP_TOKEN>
+
+# 更改使用的会话（可选，默认值："slack"）
+openclaude config set slack.session_id slack2
+
+# 重启守护进程以应用配置
+openclaude restart
+```
+
+> **注意：** 必须同时设置 `slack.bot_token` 和 `slack.app_token`，Bot 才会启动。
+> Token 也可通过环境变量 `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` 设置。
+
+**高级选项：**
+
+```bash
+# 限制私信仅接受特定用户（默认："open" — 允许所有人）
+openclaude config set slack.dm_policy allowlist
+openclaude config set slack.allow_from '["U01234567", "U09876543"]'
+
+# 限制频道提及仅响应特定频道（默认："open" — 允许所有频道）
+openclaude config set slack.channel_policy allowlist
+openclaude config set slack.channels '["C01234567"]'
+```
+
+**验证运行：**
+
+日志中出现以下信息则表示正常启动：
+
+```
+Slack bot starting (session=...)
+Slack bot ready (logged in as <BotName>, team=<TeamName>)
+```
+
+启动后，发送给 Bot 的私信和频道中的 `@提及` 将被转发至 Claude 并由 Bot 自动回复。
+
 ### systemd 集成（已配置的情况下）
 
 ```bash
@@ -219,10 +275,12 @@ CLI (openclaude)
   └── src/cli.py
         └── 通过 Unix 套接字（~/.openclaude/openclaude.sock）与守护进程通信
 
-守护进程 + API 服务器（同一进程）
-  ├── src/daemon.py  ── Unix 套接字服务器
-  ├── src/api.py     ── FastAPI + uvicorn（REST API）
-  └── src/cron.py    ── 基于 apscheduler 的调度器
+守护进程 + API 服务器 + Discord Bot + Slack Bot（同一进程）
+  ├── src/daemon.py      ── Unix 套接字服务器
+  ├── src/api.py         ── FastAPI + uvicorn（REST API）
+  ├── src/cron.py        ── 基于 apscheduler 的调度器
+  ├── src/discord_bot.py ── Discord Bot（可选）
+  └── src/slack_bot.py   ── Slack Bot（可选）
 ```
 
 ### 文件结构
@@ -235,6 +293,8 @@ CLI (openclaude)
   │   ├── api.py           # FastAPI REST API 服务器
   │   ├── cron.py          # Cron 任务管理（CronJob / CronScheduler）
   │   ├── discord_bot.py   # Discord Bot（可选）
+  │   ├── slack_bot.py     # Slack Bot（可选）
+  │   ├── utils.py         # 公共工具（配置加载等）
   │   └── cli.py           # CLI 入口点
   ├── sessions/
   │   └── sessions.json         # 会话别名 → SDK 会话 ID 映射

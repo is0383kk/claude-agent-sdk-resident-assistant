@@ -32,6 +32,7 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | HTTP REST API                        | `POST /message`, `POST /message/stream`, `GET /status` など |
 | Cron REST API                        | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` など         |
 | Discord 連携                         | デーモン起動時に自動接続（`openclaude config set` で設定）  |
+| Slack 連携                           | デーモン起動時に自動接続（`openclaude config set` で設定）  |
 
 ---
 
@@ -52,6 +53,7 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | `uvicorn>=0.30.0`          | ASGI サーバー                   |
 | `apscheduler>=3.10,<4`     | Cron ジョブスケジューラ（v3.x） |
 | `discord.py>=2.3`          | Discord Bot（オプション）       |
+| `slack-bolt>=1.18`         | Slack Bot（オプション）         |
 
 ### インストール
 
@@ -183,6 +185,60 @@ Discord bot ready (logged in as <BotName>)
 
 起動後は、設定したチャンネルに送信されたメッセージが Claude に転送され、Bot が返信します。
 
+### Slack 連携
+
+Slack Bot を接続して、DM・チャンネルメンションを Socket Mode で受信・返信できます。
+
+**前提:**
+
+1. [Slack API Portal](https://api.slack.com/apps) でアプリを作成しワークスペースにインストール
+2. **Socket Mode** を有効化し、`connections:write` スコープを持つ App-Level Token（`xapp-` 始まり）を取得
+3. Bot Token Scopes に `chat:write`, `reactions:write`, `channels:history`, `im:history`, `app_mentions:read` を追加
+4. **Event Subscriptions** を有効化し、`message.im` と `app_mention` のボットイベントを購読
+5. **Install App**画面からBot Token（xoxb始まり）を取得
+
+**セットアップ:**
+
+```bash
+# Bot Token を設定（必須、xoxb- 始まり）
+openclaude config set slack.bot_token <YOUR_BOT_TOKEN>
+
+# App Token を設定（必須、xapp- 始まり）
+openclaude config set slack.app_token <YOUR_APP_TOKEN>
+
+# 使用するセッションを変更する場合（デフォルト: "slack"）
+openclaude config set slack.session_id slack2
+
+# デーモンを再起動して反映
+openclaude restart
+```
+
+> **注意:** `slack.bot_token` と `slack.app_token` の両方が設定されている場合のみ Bot が起動します。
+> Token は環境変数 `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` でも設定できます。
+
+**詳細オプション:**
+
+```bash
+# DM を特定ユーザーに限定する（デフォルト: "open" — 全員許可）
+openclaude config set slack.dm_policy allowlist
+openclaude config set slack.allow_from '["U01234567", "U09876543"]'
+
+# チャンネルメンションを特定チャンネルに限定する（デフォルト: "open" — 全チャンネル許可）
+openclaude config set slack.channel_policy allowlist
+openclaude config set slack.channels '["C01234567"]'
+```
+
+**動作確認:**
+
+以下のログが出ていれば正常に起動しています。
+
+```
+Slack bot starting (session=...)
+Slack bot ready (logged in as <BotName>, team=<TeamName>)
+```
+
+起動後は、Bot への DM および チャンネルでの `@メンション` が Claude に転送され、Bot が返信します。
+
 ### systemd 連携（セットアップ済みの場合）
 
 ```bash
@@ -219,10 +275,12 @@ CLI (openclaude)
   └── src/cli.py
         └── Unix ソケット (~/.openclaude/openclaude.sock) 経由でデーモンに通信
 
-デーモン + API サーバー（同一プロセス）
-  ├── src/daemon.py  ── Unix ソケットサーバー
-  ├── src/api.py     ── FastAPI + uvicorn（REST API）
-  └── src/cron.py    ── apscheduler によるスケジューラ
+デーモン + API サーバー + Discord Bot + Slack Bot（同一プロセス）
+  ├── src/daemon.py      ── Unix ソケットサーバー
+  ├── src/api.py         ── FastAPI + uvicorn（REST API）
+  ├── src/cron.py        ── apscheduler によるスケジューラ
+  ├── src/discord_bot.py ── Discord Bot（オプション）
+  └── src/slack_bot.py   ── Slack Bot（オプション）
 ```
 
 ### ファイル構成
@@ -235,6 +293,8 @@ CLI (openclaude)
   │   ├── api.py           # FastAPI REST API サーバー
   │   ├── cron.py          # Cron ジョブ管理（CronJob / CronScheduler）
   │   ├── discord_bot.py   # Discord Bot（オプション）
+  │   ├── slack_bot.py     # Slack Bot（オプション）
+  │   ├── utils.py         # 共通ユーティリティ（設定読み込みなど）
   │   └── cli.py           # CLI エントリーポイント
   ├── sessions/
   │   └── sessions.json         # セッションエイリアス → SDK セッション ID マッピング
