@@ -29,3 +29,5 @@ PROMPT*
 NOTE.txt
 *docs/
 CLAUDE.md
+drawio.json
+config.local.json
