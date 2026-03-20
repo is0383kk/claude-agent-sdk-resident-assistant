@@ -76,7 +76,7 @@ class SlackBot:
         ack_reaction = config.get("ack_reaction", "eyes")
         self._ack_reaction: str = ack_reaction if isinstance(ack_reaction, str) else "eyes"
 
-        typing_message = config.get("typing_message", ":hourglass_flowing_sand: 考え中...")
+        typing_message = config.get("typing_message", ":hourglass_flowing_sand: Thinking...")
         self._typing_message: str = typing_message if isinstance(typing_message, str) else ""
 
         # GC によるタスク破棄を防ぐための参照保持セット
@@ -125,6 +125,7 @@ class SlackBot:
             thread_ts = None
 
         # 処理中リアクションを追加
+        ack_added = False
         if self._ack_reaction and event_ts:
             try:
                 await client.reactions_add(
@@ -132,6 +133,7 @@ class SlackBot:
                     channel=channel,
                     timestamp=event_ts,
                 )
+                ack_added = True
             except Exception as e:  # noqa: BLE001
                 _logger.warning("Failed to add ack reaction: %s", e)
 
@@ -193,7 +195,7 @@ class SlackBot:
                     _logger.warning("Failed to delete empty placeholder: %s", e)
         finally:
             # 処理中リアクションを除去
-            if self._ack_reaction and event_ts:
+            if ack_added:
                 try:
                     await client.reactions_remove(
                         name=self._ack_reaction,

@@ -26,10 +26,11 @@ async def _send_long_message(channel: discord.abc.Messageable, text: str) -> Non
 class _DiscordClient(discord.Client):
     """discord.Client のサブクラス。on_ready / on_message をオーバーライドして処理する。"""
 
-    def __init__(self, channel_id: int, session_id: str, **kwargs: Any) -> None:
+    def __init__(self, channel_id: int, session_id: str, ack_reaction: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._channel_id = channel_id
         self._session_id = session_id
+        self._ack_reaction = ack_reaction
         # GC によるタスク破棄を防ぐための参照保持セット
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -54,68 +55,90 @@ class _DiscordClient(discord.Client):
 
     async def _handle_message(self, message: discord.Message) -> None:
         """デーモンへのクエリ送信と Discord への返信を行う。"""
+        # 処理中リアクションを追加
+        ack_added = False
+        if self._ack_reaction:
+            try:
+                await message.add_reaction(self._ack_reaction)
+                ack_added = True
+            except discord.HTTPException as e:
+                _logger.warning("Failed to add ack reaction: %s", e)
+
         try:
-            reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
-        except OSError:
-            await _send_long_message(
-                message.channel,  # type: ignore[arg-type]
-                "ERROR: Cannot connect to daemon",
-            )
-            return
-
-        chunks: list[str] = []
-        error_msg: str | None = None
-        async with message.channel.typing():  # type: ignore[union-attr]
             try:
-                payload = {"type": "query", "session_id": self._session_id, "message": message.content}
-                writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
-                await writer.drain()
-
-                async for line in reader:
-                    resp = json.loads(line)
-                    if resp["type"] == "chunk":
-                        chunks.append(resp["text"])
-                    elif resp["type"] == "done":
-                        break
-                    elif resp["type"] == "error":
-                        error_msg = resp.get("message", "unknown error")
-                        break
-            finally:
-                writer.close()
-                await writer.wait_closed()
-
-        if error_msg is not None:
-            await _send_long_message(
-                message.channel,  # type: ignore[arg-type]
-                f"ERROR: {error_msg}",
-            )
-            return
-
-        full_response = "".join(chunks)
-        if full_response:
-            try:
+                reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
+            except OSError:
                 await _send_long_message(
                     message.channel,  # type: ignore[arg-type]
-                    full_response,
+                    "ERROR: Cannot connect to daemon",
                 )
-            except discord.HTTPException as e:
-                _logger.error("Discord send error: %s", e)
+                return
+
+            chunks: list[str] = []
+            error_msg: str | None = None
+            async with message.channel.typing():  # type: ignore[union-attr]
+                try:
+                    payload = {"type": "query", "session_id": self._session_id, "message": message.content}
+                    writer.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
+                    await writer.drain()
+
+                    async for line in reader:
+                        resp = json.loads(line)
+                        if resp["type"] == "chunk":
+                            chunks.append(resp["text"])
+                        elif resp["type"] == "done":
+                            break
+                        elif resp["type"] == "error":
+                            error_msg = resp.get("message", "unknown error")
+                            break
+                finally:
+                    writer.close()
+                    await writer.wait_closed()
+
+            if error_msg is not None:
+                await _send_long_message(
+                    message.channel,  # type: ignore[arg-type]
+                    f"ERROR: {error_msg}",
+                )
+                return
+
+            full_response = "".join(chunks)
+            if full_response:
+                try:
+                    await _send_long_message(
+                        message.channel,  # type: ignore[arg-type]
+                        full_response,
+                    )
+                except discord.HTTPException as e:
+                    _logger.error("Discord send error: %s", e)
+        finally:
+            # 処理中リアクションを除去
+            if ack_added:
+                try:
+                    await message.remove_reaction(self._ack_reaction, self.user)  # type: ignore[arg-type]
+                except discord.HTTPException as e:
+                    _logger.warning("Failed to remove ack reaction: %s", e)
 
 
 class DiscordBot:
     """Discord Bot。指定チャンネルのメッセージを claude-agent-sdk に転送する。"""
 
-    def __init__(self, token: str, channel_id: int, session_id: str) -> None:
+    def __init__(self, token: str, channel_id: int, session_id: str, config: dict[str, Any]) -> None:
         """初期化。
 
         Args:
             token: Discord Bot Token。
             channel_id: 対象チャンネルID。
             session_id: 使用するセッションエイリアス。
+            config: config.json の discord セクション。
         """
         intents = discord.Intents.default()
         intents.message_content = True
-        self._client = _DiscordClient(channel_id=channel_id, session_id=session_id, intents=intents)
+        ack_reaction = config.get("ack_reaction", "👀")
+        ack_reaction = ack_reaction if isinstance(ack_reaction, str) else "👀"
+        self._client = _DiscordClient(
+            channel_id=channel_id, session_id=session_id, ack_reaction=ack_reaction, intents=intents
+        )
         self._token = token
 
     async def start(self) -> None:
@@ -160,10 +183,10 @@ def create_discord_bot() -> "DiscordBot | None":
         return None
     try:
         channel_id = int(raw_channel_id)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         _logger.warning("Discord bot disabled: discord.channel_id is invalid: %r", raw_channel_id)
         return None
 
     session_id: str = cfg.get("session_id", DEFAULT_DISCORD_SESSION)
     _logger.info("Discord bot starting (channel_id=%d, session=%s)", channel_id, session_id)
-    return DiscordBot(token=token, channel_id=channel_id, session_id=session_id)
+    return DiscordBot(token=token, channel_id=channel_id, session_id=session_id, config=cfg)
