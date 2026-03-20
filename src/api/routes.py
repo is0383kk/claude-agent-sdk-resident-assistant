@@ -1,21 +1,5 @@
-"""OpenClaude API サーバー - FastAPI + uvicorn による HTTP エンドポイント。
+"""OpenClaude API - FastAPI エンドポイント定義とヘルパー関数。"""
 
-外部から HTTP リクエストを受け付け、Unix ソケット経由でデーモンにメッセージを転送する。
-
-エンドポイント:
-    POST   /message               メッセージ送信（完全レスポンス）
-    POST   /message/stream        メッセージ送信（SSE ストリーミング）
-    GET    /status                デーモンステータスと PID
-    GET    /sessions              セッション一覧
-    DELETE /sessions              全セッション削除
-    DELETE /sessions/{session_id} 指定セッション削除
-
-起動方法:
-    python3 -m src.api          (~/.openclaude/ から)
-    python3 -m src.api --port 8080
-"""
-
-import argparse
 import asyncio
 import json
 import logging
@@ -25,138 +9,50 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
-import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
 
 _logger = logging.getLogger(__name__)
 
-# モジュール実行 (python3 -m src.api) とスクリプト実行の両方をサポート
 try:
-    from .config import (
-        DEFAULT_PORT,
-        DEFAULT_SESSION_ID,
-        SOCKET_PATH,
-        WEBHOOK_PID_FILE,
-        setup_logging,
+    from ..config import SOCKET_PATH
+    from ..utils import daemon_request
+    from .models import (
+        CleanupResponse,
+        CronAddRequest,
+        CronJobResponse,
+        CronListResponse,
+        DeleteSessionResponse,
+        MessageRequest,
+        MessageResponse,
+        SessionInfo,
+        SessionsResponse,
+        StatusResponse,
     )
-    from .utils import daemon_request
 except ImportError:
-    _pkg_root = str(Path(__file__).parent.parent)
+    _pkg_root = str(Path(__file__).parent.parent.parent)
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
-    from src.config import (
-        DEFAULT_PORT,
-        DEFAULT_SESSION_ID,
-        SOCKET_PATH,
-        WEBHOOK_PID_FILE,
-        setup_logging,
-    )
+    from src.config import SOCKET_PATH
     from src.utils import daemon_request
-
-
-# ---------------------------------------------------------------------------
-# Pydantic モデル
-# ---------------------------------------------------------------------------
-
-
-class MessageRequest(BaseModel):
-    """POST /message のリクエストボディ。"""
-
-    session_id: str = DEFAULT_SESSION_ID
-    message: str = Field(min_length=1)
-
-
-class MessageResponse(BaseModel):
-    """POST /message のレスポンスボディ。"""
-
-    session_id: str
-    response: str
-    stop_reason: str | None = None
-    model: str | None = None
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    total_cost_usd: float | None = None
-    num_turns: int | None = None
-
-
-class SessionInfo(BaseModel):
-    """セッション情報。"""
-
-    session_id: str
-    sdk_session_id: str | None = None
-    last_active: str | None = None
-    total_tokens: int = 0
-
-
-class SessionsResponse(BaseModel):
-    """GET /sessions のレスポンスボディ。"""
-
-    sessions: list[SessionInfo]
-    total: int
-
-
-class CleanupResponse(BaseModel):
-    """DELETE /sessions のレスポンスボディ。"""
-
-    deleted_count: int
-    failed: list[str] = []
-
-
-class DeleteSessionResponse(BaseModel):
-    """DELETE /sessions/{session_id} のレスポンスボディ。"""
-
-    session_id: str
-    deleted_file: str | None = None
-    failed: str | None = None
-
-
-class StatusResponse(BaseModel):
-    """GET /status のレスポンスボディ。"""
-
-    status: str
-    pid: int
-
-
-class CronAddRequest(BaseModel):
-    """POST /cron のリクエストボディ。"""
-
-    name: str | None = None
-    schedule: str
-    session_id: str = DEFAULT_SESSION_ID
-    message: str = Field(min_length=1)
-
-
-class CronJobResponse(BaseModel):
-    """Cron ジョブ情報。"""
-
-    model_config = ConfigDict(extra="ignore")
-
-    id: str
-    name: str
-    schedule: str
-    session_id: str
-    message: str
-    enabled: bool
-    created_at: str
-    last_run_at: str | None = None
-    last_run_status: str | None = None
-
-
-class CronListResponse(BaseModel):
-    """GET /cron のレスポンスボディ。"""
-
-    jobs: list[CronJobResponse]
-    total: int
-
+    from src.api.models import (
+        CleanupResponse,
+        CronAddRequest,
+        CronJobResponse,
+        CronListResponse,
+        DeleteSessionResponse,
+        MessageRequest,
+        MessageResponse,
+        SessionInfo,
+        SessionsResponse,
+        StatusResponse,
+    )
 
 # ---------------------------------------------------------------------------
 # FastAPI アプリ
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="OpenClaude API", version="0.1.0")
-
 
 # ---------------------------------------------------------------------------
 # ヘルパー
@@ -165,12 +61,6 @@ app = FastAPI(title="OpenClaude API", version="0.1.0")
 
 async def _request_daemon(payload: dict[str, Any]) -> dict[str, Any]:
     """Unix ソケット経由でデーモンに JSON リクエストを送信し、単一レスポンスを返す。
-
-    Args:
-        payload: デーモンに送信する JSON ペイロード。
-
-    Returns:
-        デーモンからの JSON レスポンス。
 
     Raises:
         HTTPException: デーモンが起動していない場合（503）。
@@ -184,16 +74,8 @@ async def _request_daemon(payload: dict[str, Any]) -> dict[str, Any]:
     return resp
 
 
-# ---------------------------------------------------------------------------
-# エンドポイント
-# ---------------------------------------------------------------------------
-
-
 def _sse_event(data: dict[str, Any]) -> str:
     r"""Dict を SSE イベント文字列に変換する。
-
-    Args:
-        data: SSE イベントのペイロード。
 
     Returns:
         `data: {...}\\n\\n` 形式の SSE イベント文字列。
@@ -208,9 +90,6 @@ def _build_query_payload(request: MessageRequest) -> dict[str, Any]:
 
 async def _stream_message_generator(request: MessageRequest) -> AsyncGenerator[str, None]:
     r"""Unix ソケット経由でデーモンと通信し、SSE イベントを yield する。
-
-    Args:
-        request: セッション ID とメッセージを含むリクエスト。
 
     Yields:
         SSE フォーマットの文字列（`data: {...}\n\n`）。
@@ -245,12 +124,14 @@ async def _stream_message_generator(request: MessageRequest) -> AsyncGenerator[s
         await writer.wait_closed()
 
 
+# ---------------------------------------------------------------------------
+# エンドポイント
+# ---------------------------------------------------------------------------
+
+
 @app.post("/message/stream")
 async def post_message_stream(request: MessageRequest) -> StreamingResponse:
     r"""デーモンにメッセージを転送し、SSE ストリーミングでレスポンスを返す。
-
-    Args:
-        request: セッション ID とメッセージを含むリクエスト。
 
     Returns:
         SSE ストリーミングレスポンス（`text/event-stream`）。
@@ -266,12 +147,6 @@ async def post_message_stream(request: MessageRequest) -> StreamingResponse:
 @app.post("/message")
 async def post_message(request: MessageRequest) -> MessageResponse:
     """デーモンにメッセージを転送し、完全なレスポンスを返す。
-
-    Args:
-        request: セッション ID とメッセージを含むリクエスト。
-
-    Returns:
-        デーモンからの完全なレスポンス。
 
     Raises:
         HTTPException: デーモンが起動していない場合（503）またはデーモンがエラーを返した場合（500）。
@@ -322,9 +197,6 @@ async def post_message(request: MessageRequest) -> MessageResponse:
 async def get_cron() -> CronListResponse:
     """Cron ジョブ一覧を取得する。
 
-    Returns:
-        Cron ジョブ一覧と件数。
-
     Raises:
         HTTPException: デーモンが起動していない場合（503）またはエラーが発生した場合（500）。
     """
@@ -338,12 +210,6 @@ async def get_cron() -> CronListResponse:
 @app.post("/cron", status_code=201)
 async def post_cron(request: CronAddRequest) -> CronJobResponse:
     """Cron ジョブを追加する。
-
-    Args:
-        request: cron 式・セッション ID・メッセージを含むリクエスト。
-
-    Returns:
-        追加された Cron ジョブ情報。
 
     Raises:
         HTTPException: 不正な cron 式（422）、デーモン未起動（503）、エラー（500）。
@@ -368,12 +234,6 @@ async def post_cron(request: CronAddRequest) -> CronJobResponse:
 async def delete_cron(job_id: str) -> dict[str, str]:
     """Cron ジョブを削除する。
 
-    Args:
-        job_id: 削除するジョブの ID。
-
-    Returns:
-        削除されたジョブ ID を含む辞書。
-
     Raises:
         HTTPException: ジョブが見つからない場合（404）、デーモン未起動（503）、エラー（500）。
     """
@@ -388,12 +248,6 @@ async def delete_cron(job_id: str) -> dict[str, str]:
 @app.post("/cron/{job_id}/run")
 async def run_cron(job_id: str) -> dict[str, str]:
     """Cron ジョブを手動で即時実行する。
-
-    Args:
-        job_id: 実行するジョブの ID。
-
-    Returns:
-        実行開始したジョブ ID を含む辞書。
 
     Raises:
         HTTPException: ジョブが見つからない場合（404）、デーモン未起動（503）、エラー（500）。
@@ -420,9 +274,6 @@ async def get_status() -> StatusResponse:
 async def get_sessions() -> SessionsResponse:
     """デーモンからセッション一覧を取得して返す。
 
-    Returns:
-        セッション一覧と件数。
-
     Raises:
         HTTPException: デーモンが起動していない場合（503）またはエラーが発生した場合（500）。
     """
@@ -436,9 +287,6 @@ async def get_sessions() -> SessionsResponse:
 @app.delete("/sessions")
 async def cleanup_sessions() -> CleanupResponse:
     """全セッションを削除する。
-
-    Returns:
-        削除したセッション数と失敗一覧。
 
     Raises:
         HTTPException: デーモンが起動していない場合（503）またはエラーが発生した場合（500）。
@@ -456,12 +304,6 @@ async def cleanup_sessions() -> CleanupResponse:
 async def delete_session(session_id: str) -> DeleteSessionResponse:
     """指定したセッションを削除する。
 
-    Args:
-        session_id: 削除するセッションの alias。
-
-    Returns:
-        削除結果（セッション ID・削除ファイル名・失敗理由）。
-
     Raises:
         HTTPException: セッションが見つからない場合（404）、デーモン未起動（503）、エラー（500）。
     """
@@ -475,34 +317,3 @@ async def delete_session(session_id: str) -> DeleteSessionResponse:
         deleted_file=resp.get("deleted_file"),
         failed=resp.get("failed"),
     )
-
-
-# ---------------------------------------------------------------------------
-# エントリーポイント
-# ---------------------------------------------------------------------------
-
-
-async def _main(port: int) -> None:
-    """API サーバーを起動してシャットダウンまで待機する。
-
-    Args:
-        port: API サーバーがリッスンするポート番号。
-    """
-    setup_logging()
-    WEBHOOK_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
-    _logger.info("OpenClaude API server starting on port %d (PID: %d)", port, os.getpid())
-
-    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104
-    server = uvicorn.Server(config)
-    try:
-        await server.serve()
-    finally:
-        WEBHOOK_PID_FILE.unlink(missing_ok=True)
-        _logger.info("OpenClaude API server stopped.")
-
-
-if __name__ == "__main__":
-    _parser = argparse.ArgumentParser(description="OpenClaude API Server")
-    _parser.add_argument("--port", type=int, default=DEFAULT_PORT, metavar="PORT")
-    _args = _parser.parse_args()
-    asyncio.run(_main(_args.port))

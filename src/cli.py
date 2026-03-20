@@ -18,79 +18,37 @@
 
 import argparse
 import asyncio
-import collections
-import json
-import logging
 import sys
-import time
 from pathlib import Path
-from typing import Any, cast
 
 import argcomplete
 
 try:
-    from .config import (
-        CLAUDE_PROJECTS_DIR,
-        DAEMON_LOG,
-        DEFAULT_PORT,
-        DEFAULT_SESSION_ID,
-        PID_FILE,
-        SOCKET_PATH,
-    )
-    from .daemon import get_daemon_status, start_daemon_process, stop_daemon_process
-    from .utils import daemon_request, load_config, save_config
+    from .commands.config_cmds import cmd_config_get, cmd_config_set, cmd_config_show, config_get_nested
+    from .commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_list, cmd_cron_run
+    from .commands.daemon_cmds import cmd_logs, cmd_restart, cmd_start, cmd_status, cmd_stop
+    from .commands.message_cmds import cmd_message, resolve_message
+    from .commands.session_cmds import cmd_sessions, cmd_sessions_cleanup, cmd_sessions_delete
+    from .config import DEFAULT_PORT, DEFAULT_SESSION_ID
+    from .utils import load_config
 except ImportError:
     _pkg_root = str(Path(__file__).parent.parent)
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
-    from src.config import (
-        CLAUDE_PROJECTS_DIR,
-        DAEMON_LOG,
-        DEFAULT_PORT,
-        DEFAULT_SESSION_ID,
-        PID_FILE,
-        SOCKET_PATH,
-    )
-    from src.daemon import get_daemon_status, start_daemon_process, stop_daemon_process
-    from src.utils import daemon_request, load_config, save_config
-
-_CRAB = "🦀"
-_logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# 設定ファイルヘルパー
-# ---------------------------------------------------------------------------
-
-
-def _config_get_nested(data: dict[str, Any], key: str) -> Any:
-    """ドット区切りキー (例: 'default.port') でネスト dict を読み取る。"""
-    parts = key.split(".")
-    cur: Any = data
-    for part in parts:
-        if not isinstance(cur, dict):
-            return None
-        cur = cur.get(part)
-    return cur
-
-
-def _config_set_nested(data: dict[str, Any], key: str, value: Any) -> Any:
-    """ドット区切りキー (例: 'default.port') でネスト dict に値をセットする。セットした値を返す。"""
-    parts = key.split(".")
-    cur: dict[str, Any] = data
-    for part in parts[:-1]:
-        if part not in cur or not isinstance(cur[part], dict):
-            cur[part] = {}
-        cur = cur[part]
-    # 数値文字列は int に変換
-    actual = int(value) if isinstance(value, str) and value.isdigit() else value
-    cur[parts[-1]] = actual
-    return actual
+    from src.commands.config_cmds import cmd_config_get, cmd_config_set, cmd_config_show, config_get_nested
+    from src.commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_list, cmd_cron_run
+    from src.commands.daemon_cmds import cmd_logs, cmd_restart, cmd_start, cmd_status, cmd_stop
+    from src.commands.message_cmds import cmd_message, resolve_message
+    from src.commands.session_cmds import cmd_sessions, cmd_sessions_cleanup, cmd_sessions_delete
+    from src.config import DEFAULT_PORT, DEFAULT_SESSION_ID
+    from src.utils import load_config
 
 
 # ---------------------------------------------------------------------------
 # エントリーポイント
 # ---------------------------------------------------------------------------
+
+
 def main() -> None:
     """CLI のエントリーポイント。"""
     cli = OpenClaudeCLI()
@@ -100,58 +58,60 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 # CLI クラス
 # ---------------------------------------------------------------------------
+
+
 class OpenClaudeCLI:
     """コマンドライン引数を解析してデーモン操作とメッセージ送信を行うクラス。"""
 
-    def run(self) -> None:
+    def run(self) -> None:  # noqa: C901
         """引数を解析して対応するコマンドを実行する。"""
         parser = self._build_parser()
         argcomplete.autocomplete(parser)
         args = parser.parse_args()
 
         if args.command == "start":
-            self.cmd_start(getattr(args, "port", DEFAULT_PORT))
+            cmd_start(getattr(args, "port", DEFAULT_PORT))
         elif args.command == "stop":
-            self.cmd_stop()
+            cmd_stop()
         elif args.command == "restart":
-            self.cmd_restart(getattr(args, "port", DEFAULT_PORT))
+            cmd_restart(getattr(args, "port", DEFAULT_PORT))
         elif args.command == "status":
-            self.cmd_status()
+            cmd_status()
         elif args.command == "logs":
-            self.cmd_logs(getattr(args, "tail", None))
+            cmd_logs(getattr(args, "tail", None))
         elif args.command == "sessions":
             if getattr(args, "sessions_command", None) == "cleanup":
-                asyncio.run(self.cmd_sessions_cleanup())
+                asyncio.run(cmd_sessions_cleanup())
             elif getattr(args, "sessions_command", None) == "delete":
-                asyncio.run(self.cmd_sessions_delete(args.session_id))
+                asyncio.run(cmd_sessions_delete(args.session_id))
             else:
-                asyncio.run(self.cmd_sessions())
+                asyncio.run(cmd_sessions())
         elif args.command == "cron":
             cron_cmd = getattr(args, "cron_command", None)
             if cron_cmd == "add":
-                asyncio.run(self.cmd_cron_add(args.schedule, args.name, args.session, args.message))
+                asyncio.run(cmd_cron_add(args.schedule, args.name, args.session, args.message))
             elif cron_cmd == "list":
-                asyncio.run(self.cmd_cron_list())
+                asyncio.run(cmd_cron_list())
             elif cron_cmd == "delete":
-                asyncio.run(self.cmd_cron_delete(args.job_id))
+                asyncio.run(cmd_cron_delete(args.job_id))
             elif cron_cmd == "run":
-                asyncio.run(self.cmd_cron_run(args.job_id))
+                asyncio.run(cmd_cron_run(args.job_id))
             else:
                 parser.parse_args(["cron", "--help"])
         elif args.command == "config":
             config_cmd = getattr(args, "config_command", None)
             if config_cmd == "set":
-                self.cmd_config_set(args.key, args.value)
+                cmd_config_set(args.key, args.value)
             elif config_cmd == "get":
-                self.cmd_config_get(args.key)
+                cmd_config_get(args.key)
             elif config_cmd == "show":
-                self.cmd_config_show()
+                cmd_config_show()
             else:
                 parser.parse_args(["config", "--help"])
         else:
-            message = self._resolve_message(args.message)
+            message = resolve_message(args.message)
             if message is not None:
-                asyncio.run(self.cmd_message(args.session_id, message))
+                asyncio.run(cmd_message(args.session_id, message))
             else:
                 parser.print_help()
 
@@ -162,7 +122,7 @@ class OpenClaudeCLI:
         )
 
         subparsers = parser.add_subparsers(dest="command")
-        _default_port = _config_get_nested(load_config(), "default.port") or DEFAULT_PORT
+        _default_port = config_get_nested(load_config(), "default.port") or DEFAULT_PORT
         start_parser = subparsers.add_parser("start", help="Start the OpenClaude daemon")
         start_parser.add_argument(
             "--port",
@@ -226,7 +186,6 @@ class OpenClaudeCLI:
 
         config_sub.add_parser("show", help="Show all config values")
 
-        # 会話モード
         parser.add_argument(
             "--session-id",
             default=DEFAULT_SESSION_ID,
@@ -241,392 +200,3 @@ class OpenClaudeCLI:
             help="Message to send to the agent",
         )
         return parser
-
-    # ------------------------------------------------------------------
-    # デーモン管理コマンド
-    # ------------------------------------------------------------------
-    def cmd_start(self, port: int = DEFAULT_PORT) -> None:
-        """デーモンと API サーバーを起動する。既に起動済みの場合はメッセージを表示して終了する。"""
-        status, pid = get_daemon_status()
-        if status == "running":
-            print(f"OpenClaude is already running (PID: {pid})")
-            return
-
-        if status == "stale":
-            print(f"Removing stale PID file (PID: {pid} is dead)...")
-            PID_FILE.unlink(missing_ok=True)
-
-        print("Starting OpenClaude daemon...")
-        start_daemon_process(port)
-
-        # ソケットファイルが現れるまで最大15秒待機
-        for _ in range(150):
-            time.sleep(0.1)
-            if SOCKET_PATH.exists():
-                status, pid = get_daemon_status()
-                if status == "running":
-                    print(f"OpenClaude started (PID: {pid})")
-                    return
-
-        print(
-            "ERROR: Daemon did not start in time. Check daemon.log for details.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    def cmd_stop(self) -> None:
-        """デーモンを停止する。起動していない場合はメッセージを表示して終了する。"""
-        status, _ = get_daemon_status()
-        if status == "stopped":
-            print("OpenClaude is not running.")
-            return
-        if status == "stale":
-            PID_FILE.unlink(missing_ok=True)
-            SOCKET_PATH.unlink(missing_ok=True)
-            print("OpenClaude stopped (cleaned up stale state).")
-            return
-
-        print("Stopping OpenClaude daemon...")
-        ok = stop_daemon_process()
-        if ok:
-            # ソケットファイルが消えるまで最大5秒待機
-            for _ in range(50):
-                time.sleep(0.1)
-                if not SOCKET_PATH.exists():
-                    break
-            print("OpenClaude stopped.")
-        else:
-            print("ERROR: Failed to stop OpenClaude.", file=sys.stderr)
-            sys.exit(1)
-
-    def cmd_restart(self, port: int = DEFAULT_PORT) -> None:
-        """デーモンと API サーバーを再起動する。"""
-        self.cmd_stop()
-        time.sleep(0.5)
-        self.cmd_start(port)
-
-    def cmd_status(self) -> None:
-        """デーモンの稼働状態を表示する。"""
-        status, pid = get_daemon_status()
-        if status == "running":
-            print(f"OpenClaude is running (PID: {pid})")
-        elif status == "stale":
-            print(f"OpenClaude has a stale PID file (PID: {pid}, process not found).")
-        else:
-            print("OpenClaude is stopped.")
-
-    def cmd_logs(self, tail: int | None = None) -> None:
-        """デーモンログを表示する。"""
-        if not DAEMON_LOG.exists():
-            print("No log file found.", file=sys.stderr)
-            return
-
-        if tail is not None:
-            with DAEMON_LOG.open(encoding="utf-8") as f:
-                lines = list(collections.deque(f, maxlen=tail))
-            print("".join(lines), end="")
-        else:
-            print(DAEMON_LOG.read_text(encoding="utf-8"), end="")
-
-    # ------------------------------------------------------------------
-    # セッションコマンド
-    # ------------------------------------------------------------------
-
-    async def cmd_sessions(self) -> None:
-        """デーモンからセッション一覧を取得して表示する。"""
-        sessions = await self._fetch_sessions()
-
-        print(f"{_CRAB} OpenClaude\n")
-
-        if not sessions:
-            print("Sessions: 0")
-            return
-
-        print(f"Sessions: {len(sessions)}")
-        print(f"Sessions Path: {CLAUDE_PROJECTS_DIR}\n")
-
-        col_id = max(max(len(s["session_id"]) for s in sessions), 10)
-        col_sdk = max(max(len(s.get("sdk_session_id") or "-") for s in sessions), 14)
-        col_la = max(max(len(s.get("last_active") or "-") for s in sessions), 11)
-        print(f"{'session-id':<{col_id}}  {'sdk_session_id':<{col_sdk}}  {'last_active':<{col_la}}  total_tokens")
-        for s in sessions:
-            alias = s["session_id"]
-            sdk_id = s.get("sdk_session_id") or "-"
-            last_active = s.get("last_active") or "-"
-            total_tokens = s.get("total_tokens", 0)
-            print(f"{alias:<{col_id}}  {sdk_id:<{col_sdk}}  {last_active:<{col_la}}  {total_tokens}")
-
-    async def cmd_sessions_cleanup(self) -> None:
-        """全セッションをクリーンアップする。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request({"type": "cleanup_sessions"})
-            if response.get("type") == "cleanup_done":
-                count = response.get("deleted_count", 0)
-                print(f"Cleaned up {count} session(s).")
-                for f in response.get("failed", []):
-                    print(f"  [warn] {f}", file=sys.stderr)
-            elif response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    async def cmd_sessions_delete(self, session_id: str) -> None:
-        """指定したセッションを削除する。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request({"type": "delete_session", "session_id": session_id})
-            if response.get("type") == "delete_done":
-                print(f"Deleted session: {session_id}")
-                if response.get("failed"):
-                    print(f"  [warn] {response['failed']}", file=sys.stderr)
-            elif response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    # ------------------------------------------------------------------
-    # Cron コマンド
-    # ------------------------------------------------------------------
-
-    async def cmd_cron_add(self, schedule: str, name: str | None, session: str, message: str) -> None:
-        """Cron ジョブを追加する。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request(
-                {"type": "cron_add", "name": name, "schedule": schedule, "session_id": session, "message": message}
-            )
-            if response.get("type") == "cron_added":
-                print(f"Cron job added: {response['id']} ({response['name']})")
-                print(f"  schedule: {response['schedule']}")
-                print(f"  session:  {response['session_id']}")
-                print(f"  message:  {response['message']}")
-            elif response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    async def cmd_cron_list(self) -> None:
-        """Cron ジョブ一覧を表示する。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request({"type": "cron_list"})
-            if response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        jobs = response.get("jobs", [])
-        print(f"{_CRAB} OpenClaude Cron Jobs\n")
-        if not jobs:
-            print("No cron jobs registered.")
-            return
-
-        print(f"Jobs: {len(jobs)}\n")
-        col_id = max(max(len(j["id"]) for j in jobs), 8)
-        col_name = max(max(len(j["name"]) for j in jobs), 12)
-        col_sched = max(max(len(j["schedule"]) for j in jobs), 10)
-        col_session = max(max(len(j["session_id"]) for j in jobs), 7)
-        col_status = max(max(len(j.get("last_run_status") or "-") for j in jobs), 6)
-        header = (
-            f"{'id':<{col_id}}  {'name':<{col_name}}  {'schedule':<{col_sched}}  "
-            f"{'session':<{col_session}}  {'status':<{col_status}}  message"
-        )
-        print(header)
-        for j in jobs:
-            msg_preview = j["message"][:40] + ("..." if len(j["message"]) > 40 else "")
-            print(
-                f"{j['id']:<{col_id}}  {j['name']:<{col_name}}  {j['schedule']:<{col_sched}}  "
-                f"{j['session_id']:<{col_session}}  {(j.get('last_run_status') or '-'):<{col_status}}  {msg_preview}"
-            )
-
-    async def cmd_cron_delete(self, job_id: str) -> None:
-        """Cron ジョブを削除する。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request({"type": "cron_delete", "job_id": job_id})
-            if response.get("type") == "cron_deleted":
-                print(f"Deleted cron job: {job_id}")
-            elif response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    async def cmd_cron_run(self, job_id: str) -> None:
-        """Cron ジョブを手動で即時実行する。"""
-        if not self._is_daemon_up():
-            print("OpenClaude daemon is not running.")
-            return
-
-        try:
-            response = await daemon_request({"type": "cron_run", "job_id": job_id})
-            if response.get("type") == "cron_run_started":
-                print(f"Cron job started: {job_id}")
-            elif response.get("type") == "error":
-                print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    # ------------------------------------------------------------------
-    # Config コマンド
-    # ------------------------------------------------------------------
-
-    def cmd_config_set(self, key: str, value: str) -> None:
-        """設定値をセットして config.json に保存する。"""
-        data = load_config()
-        actual = _config_set_nested(data, key, value)
-        save_config(data)
-        print(f"{key} = {actual!r}")
-
-    def cmd_config_get(self, key: str) -> None:
-        """設定値を取得して表示する。"""
-        data = load_config()
-        value = _config_get_nested(data, key)
-        if value is None:
-            print(f"{key} is not set", file=sys.stderr)
-            sys.exit(1)
-        print(value)
-
-    def cmd_config_show(self) -> None:
-        """設定ファイルの全内容を表示する。"""
-        data = load_config()
-        if not data:
-            print("(no config)")
-            return
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-
-    async def _fetch_sessions(self) -> list[dict[str, Any]]:
-        """デーモンに接続してセッション一覧を取得する。デーモン未起動時は空リストを返す。"""
-        if not self._is_daemon_up():
-            return []
-
-        try:
-            response = await daemon_request({"type": "sessions"})
-            if response.get("type") == "sessions_list":
-                return cast(list[dict[str, Any]], response.get("sessions", []))
-            return []
-        except Exception:
-            return []
-
-    # ------------------------------------------------------------------
-    # メッセージコマンド
-    # ------------------------------------------------------------------
-
-    async def cmd_message(self, session_id: str, message: str) -> None:
-        """エージェントにメッセージを送信してレスポンスをストリーミング表示する。"""
-        # デーモンが起動していなければ自動起動
-        if not self._is_daemon_up():
-            print("Starting OpenClaude daemon...")
-            _cfg_port = _config_get_nested(load_config(), "default.port") or DEFAULT_PORT
-            start_daemon_process(_cfg_port)
-            # ソケットが現れるまで待機
-            for _ in range(150):
-                await asyncio.sleep(0.1)
-                if SOCKET_PATH.exists():
-                    break
-            else:
-                print(
-                    "ERROR: Daemon did not start. Check daemon.log for details.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-        try:
-            reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
-        except (FileNotFoundError, ConnectionRefusedError) as e:
-            print(f"ERROR: Cannot connect to daemon: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        try:
-            # ヘッダー表示
-            print(f"{_CRAB} OpenClaude\uff08{session_id}\uff09")
-            print("\u2502")
-            print("\u25c7")
-
-            # リクエスト送信
-            request = {"type": "query", "session_id": session_id, "message": message}
-            writer.write((json.dumps(request, ensure_ascii=False) + "\n").encode("utf-8"))
-            await writer.drain()
-
-            # レスポンスをストリーミング受信
-            while True:
-                response = await self._read_json(reader)
-                resp_type = response.get("type")
-
-                if resp_type == "chunk":
-                    text = response.get("text", "")
-                    print(text, end="", flush=True)
-
-                elif resp_type == "done":
-                    print()  # 最終改行
-                    break
-
-                elif resp_type == "error":
-                    print()
-                    print(f"ERROR: {response.get('message')}", file=sys.stderr)
-                    sys.exit(1)
-
-                else:
-                    _logger.debug("cmd_message: unknown response type: %s", resp_type)
-
-        finally:
-            writer.close()
-            await writer.wait_closed()
-
-    # ------------------------------------------------------------------
-    # ヘルパー
-    # ------------------------------------------------------------------
-
-    def _resolve_message(self, message_arg: str | None) -> str | None:
-        """コマンドライン引数と stdin からメッセージを解決する。
-
-        stdin がパイプ/リダイレクトの場合は stdin の内容を読み込む。
-        - message_arg が None の場合: stdin の内容をそのままメッセージにする。
-        - message_arg がある場合: stdin の内容を前置きし、message_arg を後ろに結合する。
-          例: `cat report.txt | openclaude -m "これを要約して"`
-        """
-        if sys.stdin.isatty():
-            return message_arg
-
-        stdin_text = sys.stdin.read().strip()
-        if not stdin_text:
-            return message_arg
-
-        return stdin_text if message_arg is None else stdin_text + "\n\n" + message_arg
-
-    def _is_daemon_up(self) -> bool:
-        status, _ = get_daemon_status()
-        return status == "running"
-
-    async def _read_json(self, reader: asyncio.StreamReader) -> dict[str, Any]:
-        line = await reader.readline()
-        if not line:
-            return {}
-        return cast(dict[str, Any], json.loads(line.decode("utf-8").strip()))
