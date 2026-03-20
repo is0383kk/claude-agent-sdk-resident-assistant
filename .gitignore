@@ -1,4 +1,4 @@
-CLAUDE.md
+.CLAUDE.md
 .claude/settings.json
 .claude/settings.local.json
 openclaude.sock
@@ -28,3 +28,4 @@ FEATURES.md
 PROMPT*
 NOTE.txt
 *docs/
+CLAUDE.md
