@@ -15,13 +15,15 @@ from fastapi.responses import StreamingResponse
 _logger = logging.getLogger(__name__)
 
 try:
-    from ..config import SOCKET_PATH
+    from ..config import CRON_RUNS_DIR, SOCKET_PATH
     from ..utils import daemon_request
     from .models import (
         CleanupResponse,
         CronAddRequest,
         CronJobResponse,
         CronListResponse,
+        CronRunRecord,
+        CronRunsResponse,
         CronUpdateRequest,
         DeleteSessionResponse,
         MessageRequest,
@@ -34,13 +36,13 @@ except ImportError:
     _pkg_root = str(Path(__file__).parent.parent.parent)
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
-    from src.config import SOCKET_PATH
-    from src.utils import daemon_request
     from src.api.models import (
         CleanupResponse,
         CronAddRequest,
         CronJobResponse,
         CronListResponse,
+        CronRunRecord,
+        CronRunsResponse,
         CronUpdateRequest,
         DeleteSessionResponse,
         MessageRequest,
@@ -49,6 +51,8 @@ except ImportError:
         SessionsResponse,
         StatusResponse,
     )
+    from src.config import CRON_RUNS_DIR, SOCKET_PATH
+    from src.utils import daemon_request
 
 # ---------------------------------------------------------------------------
 # FastAPI アプリ
@@ -293,6 +297,28 @@ async def run_cron(job_id: str) -> dict[str, str]:
         status_code = 404 if "not found" in msg.lower() else 500
         raise HTTPException(status_code=status_code, detail=msg)
     return {"job_id": resp.get("job_id", job_id), "status": "started"}
+
+
+@app.get("/cron/{job_id}/runs")
+async def get_cron_runs(job_id: str, limit: int = 20) -> CronRunsResponse:
+    """指定した Cron ジョブの実行履歴を返す（ファイル直読み）。
+
+    Raises:
+        HTTPException: ファイル読み込みエラーの場合（500）。
+    """
+    log_path = CRON_RUNS_DIR / f"{job_id}.jsonl"
+    records: list[dict] = []
+    if log_path.exists():
+        try:
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+    total = len(records)
+    runs = [CronRunRecord(**r) for r in reversed(records)][:limit]
+    return CronRunsResponse(job_id=job_id, runs=runs, total=total, limit=limit)
 
 
 @app.get("/status")

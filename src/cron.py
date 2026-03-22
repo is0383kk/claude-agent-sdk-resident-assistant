@@ -224,7 +224,9 @@ class CronScheduler:
         """
         if trigger is None:
             trigger = CronTrigger.from_crontab(job.schedule)
-        self._scheduler.add_job(self._execute_job, trigger, id=job.id, args=[job.id], replace_existing=True)
+        self._scheduler.add_job(
+            self._execute_job, trigger, id=job.id, args=[job.id], replace_existing=True, misfire_grace_time=60
+        )
 
     async def _execute_job(self, job_id: str) -> None:
         """スケジューラから呼び出されるジョブ実行関数。
