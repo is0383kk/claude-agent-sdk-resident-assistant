@@ -25,7 +25,7 @@ import argcomplete
 
 try:
     from .commands.config_cmds import cmd_config_get, cmd_config_set, cmd_config_show, config_get_nested
-    from .commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_list, cmd_cron_run
+    from .commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_edit, cmd_cron_list, cmd_cron_run
     from .commands.daemon_cmds import cmd_logs, cmd_restart, cmd_start, cmd_status, cmd_stop
     from .commands.message_cmds import cmd_message, resolve_message
     from .commands.session_cmds import cmd_sessions, cmd_sessions_cleanup, cmd_sessions_delete
@@ -36,7 +36,7 @@ except ImportError:
     if _pkg_root not in sys.path:
         sys.path.insert(0, _pkg_root)
     from src.commands.config_cmds import cmd_config_get, cmd_config_set, cmd_config_show, config_get_nested
-    from src.commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_list, cmd_cron_run
+    from src.commands.cron_cmds import cmd_cron_add, cmd_cron_delete, cmd_cron_edit, cmd_cron_list, cmd_cron_run
     from src.commands.daemon_cmds import cmd_logs, cmd_restart, cmd_start, cmd_status, cmd_stop
     from src.commands.message_cmds import cmd_message, resolve_message
     from src.commands.session_cmds import cmd_sessions, cmd_sessions_cleanup, cmd_sessions_delete
@@ -96,6 +96,9 @@ class OpenClaudeCLI:
                 asyncio.run(cmd_cron_delete(args.job_id))
             elif cron_cmd == "run":
                 asyncio.run(cmd_cron_run(args.job_id))
+            elif cron_cmd == "edit":
+                enable_flag: bool | None = True if args.enable else (False if args.disable else None)
+                asyncio.run(cmd_cron_edit(args.job_id, args.name, args.schedule, args.session, args.message, enable_flag))
             else:
                 parser.parse_args(["cron", "--help"])
         elif args.command == "config":
@@ -173,6 +176,18 @@ class OpenClaudeCLI:
 
         cron_run_parser = cron_sub.add_parser("run", help="Manually trigger a cron job")
         cron_run_parser.add_argument("job_id", metavar="JOB_ID", help="Job ID to run")
+
+        cron_edit_parser = cron_sub.add_parser("edit", help="Edit an existing cron job")
+        cron_edit_parser.add_argument("job_id", metavar="JOB_ID", help="Job ID to edit")
+        cron_edit_parser.add_argument("--name", "-n", default=None, metavar="NAME", help="New job display name")
+        cron_edit_parser.add_argument("--schedule", default=None, metavar="CRON", help="New 5-field cron expression")
+        cron_edit_parser.add_argument(
+            "--session", "-s", default=None, metavar="SESSION_ID", help="New target session alias"
+        )
+        cron_edit_parser.add_argument("--message", "-m", default=None, metavar="MESSAGE", help="New message to send")
+        _enable_group = cron_edit_parser.add_mutually_exclusive_group()
+        _enable_group.add_argument("--enable", action="store_true", default=False, help="Enable the job")
+        _enable_group.add_argument("--disable", action="store_true", default=False, help="Disable the job")
 
         config_parser = subparsers.add_parser("config", help="Manage persistent configuration")
         config_sub = config_parser.add_subparsers(dest="config_command")

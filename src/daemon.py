@@ -95,6 +95,8 @@ class OpenClaudeDaemon:
                 await self.handle_cron_delete(request, writer)
             elif req_type == "cron_run":
                 await self.handle_cron_run(request, writer)
+            elif req_type == "cron_update":
+                await self.handle_cron_update(request, writer)
             else:
                 await send_json(writer, {"type": "error", "message": f"Unknown type: {req_type}"})
         except json.JSONDecodeError as e:
@@ -318,6 +320,26 @@ class OpenClaudeDaemon:
             return
 
         await send_json(writer, {"type": "cron_run_started", "job_id": job_id})
+
+    async def handle_cron_update(self, request: dict[str, Any], writer: asyncio.StreamWriter) -> None:
+        """Cron ジョブのフィールドを部分更新する。"""
+        job_id = request.get("job_id", "")
+        patch = request.get("patch", {})
+
+        if not job_id:
+            await send_json(writer, {"type": "error", "message": "job_id is required"})
+            return
+        if not patch:
+            await send_json(writer, {"type": "error", "message": "patch is empty"})
+            return
+
+        try:
+            job = self._cron.update_job(job_id, patch)
+        except ValueError as e:
+            await send_json(writer, {"type": "error", "message": str(e)})
+            return
+
+        await send_json(writer, {"type": "cron_updated", **asdict(job)})
 
     async def _execute_for_cron(self, job_id: str, session_id: str, message: str) -> None:
         """CronScheduler から呼び出されるジョブ実行コールバック。

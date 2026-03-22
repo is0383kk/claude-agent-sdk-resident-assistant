@@ -22,6 +22,7 @@ try:
         CronAddRequest,
         CronJobResponse,
         CronListResponse,
+        CronUpdateRequest,
         DeleteSessionResponse,
         MessageRequest,
         MessageResponse,
@@ -40,6 +41,7 @@ except ImportError:
         CronAddRequest,
         CronJobResponse,
         CronListResponse,
+        CronUpdateRequest,
         DeleteSessionResponse,
         MessageRequest,
         MessageResponse,
@@ -227,6 +229,39 @@ async def post_cron(request: CronAddRequest) -> CronJobResponse:
         msg = resp.get("message", "Unknown error")
         status_code = 422 if "invalid cron" in msg.lower() else 500
         raise HTTPException(status_code=status_code, detail=msg)
+    return CronJobResponse.model_validate(resp)
+
+
+@app.patch("/cron/{job_id}")
+async def update_cron(job_id: str, request: CronUpdateRequest) -> CronJobResponse:
+    """Cron ジョブを部分更新する。
+
+    Raises:
+        HTTPException: ジョブが見つからない場合（404）、不正な cron 式 / patch が空（422）、
+                       デーモン未起動（503）、エラー（500）。
+    """
+    patch: dict[str, Any] = {
+        k: v
+        for k, v in {
+            "name": request.name,
+            "schedule": request.schedule,
+            "session_id": request.session_id,
+            "message": request.message,
+            "enabled": request.enabled,
+        }.items()
+        if v is not None
+    }
+    if not patch:
+        raise HTTPException(status_code=422, detail="patch is empty")
+
+    resp = await _request_daemon({"type": "cron_update", "job_id": job_id, "patch": patch})
+    if resp.get("type") == "error":
+        msg = resp.get("message", "Unknown error")
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg)
+        if "invalid cron" in msg.lower() or "patch is empty" in msg.lower():
+            raise HTTPException(status_code=422, detail=msg)
+        raise HTTPException(status_code=500, detail=msg)
     return CronJobResponse.model_validate(resp)
 
 

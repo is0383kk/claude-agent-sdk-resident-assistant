@@ -127,6 +127,56 @@ class CronScheduler:
         """ジョブ一覧を返す。"""
         return list(self._jobs.values())
 
+    def update_job(self, job_id: str, patch: dict[str, Any]) -> CronJob:
+        """ジョブのフィールドを部分更新し、永続化する。
+
+        Args:
+            job_id: 更新するジョブの ID。
+            patch: 変更するフィールドと値の辞書。
+                   許可キー: name, schedule, session_id, message, enabled。
+
+        Returns:
+            更新後の CronJob。
+
+        Raises:
+            ValueError: job_id が存在しない、patch が空、cron 式が不正な場合。
+        """
+        if job_id not in self._jobs:
+            raise ValueError(f"Job not found: {job_id}")
+        if not patch:
+            raise ValueError("patch is empty")
+
+        job = self._jobs[job_id]
+        new_schedule = patch.get("schedule")
+        new_enabled = patch.get("enabled")
+
+        # schedule 変更時はバリデーション（不正な cron 式は ValueError を送出）
+        trigger: CronTrigger | None = None
+        if new_schedule is not None:
+            trigger = CronTrigger.from_crontab(new_schedule)
+
+        # 許可フィールドのみ反映（id, created_at 等は変更しない）
+        allowed = {"name", "schedule", "session_id", "message", "enabled"}
+        for key, val in patch.items():
+            if key in allowed:
+                setattr(job, key, val)
+
+        # apscheduler の登録状態を更新
+        if new_schedule is not None:
+            if self._scheduler.get_job(job_id) is not None:
+                self._scheduler.remove_job(job_id)
+            if job.enabled:
+                self._register_job(job, trigger)
+        elif new_enabled is not None:
+            if new_enabled and self._scheduler.get_job(job_id) is None:
+                self._register_job(job)
+            elif not new_enabled and self._scheduler.get_job(job_id) is not None:
+                self._scheduler.remove_job(job_id)
+
+        self._save_jobs()
+        _logger.info("cron_update: id=%s, patch_keys=%s", job_id, list(patch.keys()))
+        return job
+
     def delete_job(self, job_id: str) -> None:
         """ジョブをスケジューラから削除し、永続化ファイルからも削除する。
 

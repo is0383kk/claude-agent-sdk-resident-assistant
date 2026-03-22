@@ -81,6 +81,16 @@ class CronAddRequest(BaseModel):
     message: str = Field(min_length=1)
 
 
+class CronUpdateRequest(BaseModel):
+    """PATCH /cron/{job_id} のリクエストボディ。"""
+
+    name: str | None = None
+    schedule: str | None = None
+    session_id: str | None = None
+    message: str | None = None
+    enabled: bool | None = None
+
+
 class CronJobResponse(BaseModel):
     """Cron ジョブ情報。"""
 

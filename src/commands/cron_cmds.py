@@ -75,15 +75,17 @@ async def cmd_cron_list() -> None:
     col_status = max(max(len(j.get("last_run_status") or "-") for j in jobs), 6)
     header = (
         f"{'id':<{col_id}}  {'name':<{col_name}}  {'schedule':<{col_sched}}  "
-        f"{'session':<{col_session}}  {'status':<{col_status}}  message"
+        f"{'session':<{col_session}}  {'enabled':<7}  {'status':<{col_status}}  message"
     )
     print(header)
     for j in jobs:
+        enabled_str = "True" if j.get("enabled", True) else "False"
         msg_preview = j["message"][:40] + ("..." if len(j["message"]) > 40 else "")
-        print(
+        row = (
             f"{j['id']:<{col_id}}  {j['name']:<{col_name}}  {j['schedule']:<{col_sched}}  "
-            f"{j['session_id']:<{col_session}}  {(j.get('last_run_status') or '-'):<{col_status}}  {msg_preview}"
+            f"{j['session_id']:<{col_session}}  {enabled_str:<7}  {(j.get('last_run_status') or '-'):<{col_status}}  {msg_preview}"
         )
+        print(row)
 
 
 async def cmd_cron_delete(job_id: str) -> None:
@@ -114,6 +116,51 @@ async def cmd_cron_run(job_id: str) -> None:
         response = await daemon_request({"type": "cron_run", "job_id": job_id})
         if response.get("type") == "cron_run_started":
             print(f"Cron job started: {job_id}")
+        elif response.get("type") == "error":
+            print(f"ERROR: {response.get('message')}", file=sys.stderr)
+            sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+async def cmd_cron_edit(
+    job_id: str,
+    name: str | None,
+    schedule: str | None,
+    session: str | None,
+    message: str | None,
+    enable: bool | None,
+) -> None:
+    """Cron ジョブのフィールドを部分更新する。"""
+    if not _is_daemon_up():
+        print("OpenClaude daemon is not running.")
+        return
+
+    patch: dict = {}
+    if name is not None:
+        patch["name"] = name
+    if schedule is not None:
+        patch["schedule"] = schedule
+    if session is not None:
+        patch["session_id"] = session
+    if message is not None:
+        patch["message"] = message
+    if enable is not None:
+        patch["enabled"] = enable
+
+    if not patch:
+        print("No fields to update specified.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        response = await daemon_request({"type": "cron_update", "job_id": job_id, "patch": patch})
+        if response.get("type") == "cron_updated":
+            print(f"Cron job updated: {response['id']} ({response['name']})")
+            print(f"  schedule: {response['schedule']}")
+            print(f"  session:  {response['session_id']}")
+            print(f"  enabled:  {response['enabled']}")
+            print(f"  message:  {response['message']}")
         elif response.get("type") == "error":
             print(f"ERROR: {response.get('message')}", file=sys.stderr)
             sys.exit(1)
