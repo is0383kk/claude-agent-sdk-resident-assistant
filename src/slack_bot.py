@@ -15,7 +15,7 @@ from .utils import load_config
 
 _logger = logging.getLogger(__name__)
 
-MAX_SLACK_LENGTH = 4000
+MAX_SLACK_LENGTH = 3000
 DEFAULT_SLACK_SESSION = "slack"
 
 
@@ -27,7 +27,7 @@ async def _send_long_message(
     placeholder_ts: str | None = None,
     placeholder_channel: str | None = None,
 ) -> None:
-    """4000文字超の場合は分割して送信する。
+    """3000文字超の場合は分割して送信する。
 
     placeholder_ts が指定された場合、最初のチャンクはプレースホルダーを chat.update で
     上書きし、残りのチャンクは新規メッセージとして投稿する。
@@ -45,6 +45,32 @@ async def _send_long_message(
             if thread_ts is not None:
                 kwargs["thread_ts"] = thread_ts
             await client.chat_postMessage(**kwargs)
+
+
+async def _post_error_to_slack(
+    client: Any,
+    channel: str,
+    thread_ts: str | None,
+    error_text: str,
+    placeholder_ts: str | None = None,
+    placeholder_channel: str | None = None,
+) -> None:
+    """エラーメッセージを Slack に送信する。placeholder がある場合は上書きする。"""
+    msg = f":x: {error_text}"
+    try:
+        if placeholder_ts is not None:
+            await client.chat_update(
+                channel=placeholder_channel or channel,
+                ts=placeholder_ts,
+                text=msg,
+            )
+        else:
+            kwargs: dict[str, Any] = {"channel": channel, "text": msg}
+            if thread_ts is not None:
+                kwargs["thread_ts"] = thread_ts
+            await client.chat_postMessage(**kwargs)
+    except Exception as e:  # noqa: BLE001
+        _logger.error("Failed to send error message to Slack: %s", e)
 
 
 class SlackBot:
@@ -159,6 +185,7 @@ class SlackBot:
                 reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
             except OSError as e:
                 error_msg = f"Cannot connect to daemon: {e}"
+                await _post_error_to_slack(client, channel, thread_ts, error_msg, placeholder_ts, placeholder_channel)
                 return
 
             try:
@@ -187,6 +214,7 @@ class SlackBot:
                     )
                 except Exception as e:  # noqa: BLE001
                     _logger.error("Slack send error: %s", e)
+                    await _post_error_to_slack(client, channel, thread_ts, str(e), placeholder_ts, placeholder_channel)
             elif placeholder_ts is not None:
                 # 応答が空の場合はプレースホルダーを削除
                 try:
