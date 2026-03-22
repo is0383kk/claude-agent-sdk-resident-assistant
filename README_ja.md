@@ -28,9 +28,9 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | stdin / パイプ入力                   | `echo "質問" \| openclaude`                                 |
 | ログ表示                             | `openclaude logs [--tail N]`                                |
 | セッション管理                       | `openclaude sessions`                                       |
-| Cron ジョブ管理                      | `openclaude cron add/list/delete/run`                       |
+| Cron ジョブ管理                      | `openclaude cron add/list/delete/run/edit`                  |
 | HTTP REST API                        | `POST /message`, `POST /message/stream`, `GET /status` など |
-| Cron REST API                        | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` など         |
+| Cron REST API                        | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` など |
 | Discord 連携                         | デーモン起動時に自動接続（`openclaude config set` で設定）  |
 | Slack 連携                           | デーモン起動時に自動接続（`openclaude config set` で設定）  |
 
@@ -140,6 +140,13 @@ openclaude cron list
 
 # 手動実行
 openclaude cron run <job-id>
+
+# ジョブを編集（フィールドを個別に変更可能）
+openclaude cron edit <job-id> --name "新しい名前"
+openclaude cron edit <job-id> --schedule "0 10 * * *" --message "更新したプロンプト"
+openclaude cron edit <job-id> --session work
+openclaude cron edit <job-id> --disable
+openclaude cron edit <job-id> --enable
 
 # 削除
 openclaude cron delete <job-id>
@@ -263,5 +270,6 @@ systemctl --user status openclaude
 | `DELETE` | `/sessions/{id}`  | 指定セッション削除                   |
 | `GET`    | `/cron`           | Cron ジョブ一覧                      |
 | `POST`   | `/cron`           | Cron ジョブ追加                      |
+| `PATCH`  | `/cron/{id}`      | Cron ジョブ編集                      |
 | `DELETE` | `/cron/{id}`      | Cron ジョブ削除                      |
 | `POST`   | `/cron/{id}/run`  | Cron ジョブ手動実行                  |

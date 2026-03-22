@@ -28,9 +28,9 @@
 | stdin / 管道输入            | `echo "问题" \| openclaude`                                 |
 | 查看日志                    | `openclaude logs [--tail N]`                                |
 | 会话管理                    | `openclaude sessions`                                       |
-| Cron 任务管理               | `openclaude cron add/list/delete/run`                       |
+| Cron 任务管理               | `openclaude cron add/list/delete/run/edit`                  |
 | HTTP REST API               | `POST /message`, `POST /message/stream`, `GET /status` 等   |
-| Cron REST API               | `GET /cron`, `POST /cron`, `DELETE /cron/{id}` 等           |
+| Cron REST API               | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` 等 |
 | Discord 集成                | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
 | Slack 集成                  | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
 
@@ -140,6 +140,13 @@ openclaude cron list
 
 # 手动执行
 openclaude cron run <job-id>
+
+# 编辑任务（可单独修改各字段）
+openclaude cron edit <job-id> --name "新名称"
+openclaude cron edit <job-id> --schedule "0 10 * * *" --message "更新后的提示词"
+openclaude cron edit <job-id> --session work
+openclaude cron edit <job-id> --disable
+openclaude cron edit <job-id> --enable
 
 # 删除任务
 openclaude cron delete <job-id>
@@ -263,5 +270,6 @@ systemctl --user status openclaude
 | `DELETE` | `/sessions/{id}`  | 删除指定会话             |
 | `GET`    | `/cron`           | Cron 任务列表            |
 | `POST`   | `/cron`           | 添加 Cron 任务           |
+| `PATCH`  | `/cron/{id}`      | 编辑 Cron 任务           |
 | `DELETE` | `/cron/{id}`      | 删除 Cron 任务           |
 | `POST`   | `/cron/{id}/run`  | 手动执行 Cron 任务       |

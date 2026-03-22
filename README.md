@@ -28,9 +28,9 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 | stdin / pipe input                     | `echo "question" \| openclaude`                                      |
 | View logs                              | `openclaude logs [--tail N]`                                         |
 | Session management                     | `openclaude sessions`                                                |
-| Cron job management                    | `openclaude cron add/list/delete/run`                                |
+| Cron job management                    | `openclaude cron add/list/delete/run/edit`                           |
 | HTTP REST API                          | `POST /message`, `POST /message/stream`, `GET /status`, etc.         |
-| Cron REST API                          | `GET /cron`, `POST /cron`, `DELETE /cron/{id}`, etc.                 |
+| Cron REST API                          | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}`, etc. |
 | Discord integration                    | Auto-connect on daemon start (configure via `openclaude config set`) |
 | Slack integration                      | Auto-connect on daemon start (configure via `openclaude config set`) |
 
@@ -140,6 +140,13 @@ openclaude cron list
 
 # Run manually
 openclaude cron run <job-id>
+
+# Edit a job (patch any combination of fields)
+openclaude cron edit <job-id> --name "new name"
+openclaude cron edit <job-id> --schedule "0 10 * * *" --message "Updated prompt"
+openclaude cron edit <job-id> --session work
+openclaude cron edit <job-id> --disable
+openclaude cron edit <job-id> --enable
 
 # Delete a job
 openclaude cron delete <job-id>
@@ -263,5 +270,6 @@ After starting the daemon, it is accessible at `http://localhost:28789` by defau
 | `DELETE` | `/sessions/{id}`  | Delete a specific session    |
 | `GET`    | `/cron`           | List cron jobs               |
 | `POST`   | `/cron`           | Add a cron job               |
+| `PATCH`  | `/cron/{id}`      | Edit a cron job              |
 | `DELETE` | `/cron/{id}`      | Delete a cron job            |
 | `POST`   | `/cron/{id}/run`  | Run a cron job manually      |
