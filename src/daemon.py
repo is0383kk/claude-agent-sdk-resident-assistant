@@ -19,6 +19,7 @@ _logger = logging.getLogger(__name__)
 try:
     from .config import BASE_DIR, PID_FILE, SESSIONS_DIR, SOCKET_PATH
     from .cron import CronScheduler
+    from .heartbeat import HeartbeatScheduler
     from .session_store import SessionStore
     from .stream import handle_assistant_message, handle_result_message, handle_stream_event, send_json
 except ImportError:
@@ -27,6 +28,7 @@ except ImportError:
         sys.path.insert(0, _pkg_root)
     from src.config import BASE_DIR, PID_FILE, SESSIONS_DIR, SOCKET_PATH
     from src.cron import CronScheduler
+    from src.heartbeat import HeartbeatScheduler
     from src.session_store import SessionStore
     from src.stream import handle_assistant_message, handle_result_message, handle_stream_event, send_json
 
@@ -40,6 +42,7 @@ class OpenClaudeDaemon:
         self._server: asyncio.AbstractServer | None = None
         self._shutdown_event = asyncio.Event()
         self._cron: CronScheduler = CronScheduler(self._execute_for_cron)
+        self._heartbeat: HeartbeatScheduler = HeartbeatScheduler(self._execute_for_heartbeat)
 
     async def start(self) -> None:
         """Unix ソケットサーバーを起動し、シャットダウンまで待機する。"""
@@ -54,12 +57,14 @@ class OpenClaudeDaemon:
             loop.add_signal_handler(sig, self._shutdown_event.set)
 
         await self._cron.start()
+        await self._heartbeat.start()
         _logger.info("OpenClaude daemon started (PID: %d)", os.getpid())
 
         async with self._server:
             await self._shutdown_event.wait()
 
         await self._cron.stop()
+        await self._heartbeat.stop()
         SOCKET_PATH.unlink(missing_ok=True)
         PID_FILE.unlink(missing_ok=True)
         _logger.info("OpenClaude daemon stopped.")
@@ -341,11 +346,17 @@ class OpenClaudeDaemon:
 
         await send_json(writer, {"type": "cron_updated", **asdict(job)})
 
-    async def _execute_for_cron(self, job_id: str, session_id: str, message: str) -> None:
-        """CronScheduler から呼び出されるジョブ実行コールバック。
+    async def _run_sdk_query(self, session_id: str, message: str) -> str:
+        """claude-agent-sdk を呼び出し、ログのみで実行してレスポンステキストを返す共通ヘルパー。
 
-        handle_query と同じ claude-agent-sdk 呼び出しロジックを使うが、
-        StreamWriter へのストリーミングの代わりにログ出力のみを行う。
+        Cron ジョブと Heartbeat の両方から利用される。writer=None でストリーミングなし。
+
+        Args:
+            session_id: 実行するセッションのエイリアス。
+            message: エージェントに送るプロンプト。
+
+        Returns:
+            エージェントのレスポンステキスト全文。
         """
         try:
             from claude_agent_sdk import (  # noqa: PLC0415
@@ -358,7 +369,6 @@ class OpenClaudeDaemon:
         except ImportError as e:
             raise RuntimeError(f"claude_agent_sdk not installed: {e}") from e
 
-        _logger.info("cron_execute_query: job=%s, session=%s, message_len=%d", job_id, session_id, len(message))
         sdk_session_id = self._store.get(session_id)
 
         options = ClaudeAgentOptions(
@@ -383,4 +393,17 @@ class OpenClaudeDaemon:
             elif isinstance(msg, ResultMessage):
                 await handle_result_message(msg, None, current_model)
 
+        return full_text
+
+    async def _execute_for_cron(self, job_id: str, session_id: str, message: str) -> None:
+        """CronScheduler から呼び出されるジョブ実行コールバック。"""
+        _logger.info("cron_execute_query: job=%s, session=%s, message_len=%d", job_id, session_id, len(message))
+        full_text = await self._run_sdk_query(session_id, message)
         _logger.info("cron_execute_query result: job=%s, text_len=%d", job_id, len(full_text))
+
+    async def _execute_for_heartbeat(self, session_id: str, prompt: str) -> str | None:
+        """HeartbeatScheduler から呼び出されるターン実行コールバック。"""
+        _logger.info("heartbeat_execute_query: session=%s, message_len=%d", session_id, len(prompt))
+        full_text = await self._run_sdk_query(session_id, prompt)
+        _logger.info("heartbeat_execute_query result: text_len=%d", len(full_text))
+        return full_text

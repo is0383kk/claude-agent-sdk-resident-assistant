@@ -33,6 +33,7 @@ Runs as a Unix socket server, accepting messages from the CLI and REST API and p
 | Cron REST API                          | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}`, etc. |
 | Discord integration                    | Auto-connect on daemon start (configure via `openclaude config set`) |
 | Slack integration                      | Auto-connect on daemon start (configure via `openclaude config set`) |
+| Heartbeat                              | Periodic polling via `openclaude config set heartbeat.every 30m`     |
 
 ---
 
@@ -151,6 +152,57 @@ openclaude cron edit <job-id> --enable
 # Delete a job
 openclaude cron delete <job-id>
 ```
+
+### Heartbeat
+
+Run periodic agent turns on the main session to process a checklist in `~/.openclaude/HEARTBEAT.md`.
+Unlike Cron, Heartbeat preserves the main session's conversation context across executions.
+If the agent replies with only `HEARTBEAT_OK`, the response is suppressed (logged only).
+
+**Setup:**
+
+```bash
+# Enable heartbeat (every 30 minutes)
+openclaude config set heartbeat.every 30m
+
+# Disable heartbeat
+openclaude config set heartbeat.every 0m
+
+# Temporarily pause without losing the interval setting
+openclaude config set heartbeat.disabled true
+
+# Set active hours (only runs between 09:00 and 22:00)
+openclaude config set heartbeat.active_hours.start "09:00"
+openclaude config set heartbeat.active_hours.end "22:00"
+
+# Restart daemon to apply
+openclaude restart
+```
+
+**HEARTBEAT.md:**
+
+Create `~/.openclaude/HEARTBEAT.md` with a checklist for the agent to process:
+
+```markdown
+# Heartbeat Checklist
+
+- Check for any urgent pending tasks
+- If nothing needs attention, reply HEARTBEAT_OK
+```
+
+> **Note:** If `HEARTBEAT.md` does not exist, the daemon runs with the default prompt only.
+> If the file contains only headings or blank lines, the execution is skipped to reduce API calls.
+
+**Verify:**
+
+Check that the following messages appear in the logs:
+
+```
+Heartbeat scheduler started (interval=1800s)
+HEARTBEAT_OK (suppressed)
+```
+
+If the agent has something to report, the log shows `Heartbeat alert (len=N)` instead.
 
 ### Discord Integration
 

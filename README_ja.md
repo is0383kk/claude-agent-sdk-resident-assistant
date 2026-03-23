@@ -33,6 +33,7 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 | Cron REST API                        | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` など |
 | Discord 連携                         | デーモン起動時に自動接続（`openclaude config set` で設定）  |
 | Slack 連携                           | デーモン起動時に自動接続（`openclaude config set` で設定）  |
+| Heartbeat                            | `openclaude config set heartbeat.every 30m` で定期ポーリング |
 
 ---
 
@@ -151,6 +152,57 @@ openclaude cron edit <job-id> --enable
 # 削除
 openclaude cron delete <job-id>
 ```
+
+### Heartbeat
+
+メインセッションで定期的にエージェントターンを実行し、`~/.openclaude/HEARTBEAT.md` のチェックリストを処理します。
+Cron と異なり、メインセッションの会話コンテキストを保持したまま実行されます。
+エージェントが `HEARTBEAT_OK` とだけ返した場合は通知を抑制し、ログのみで完了します。
+
+**セットアップ:**
+
+```bash
+# Heartbeat を有効化（30分間隔）
+openclaude config set heartbeat.every 30m
+
+# Heartbeat を無効化
+openclaude config set heartbeat.every 0m
+
+# 間隔設定を保持したまま一時停止
+openclaude config set heartbeat.disabled true
+
+# アクティブ時間帯を設定（09:00〜22:00 の間のみ実行）
+openclaude config set heartbeat.active_hours.start "09:00"
+openclaude config set heartbeat.active_hours.end "22:00"
+
+# デーモンを再起動して反映
+openclaude restart
+```
+
+**HEARTBEAT.md:**
+
+`~/.openclaude/HEARTBEAT.md` にエージェントへのチェックリストを記述します。
+
+```markdown
+# Heartbeat チェックリスト
+
+- 急ぎの未完了タスクがあれば確認して
+- 何もなければ HEARTBEAT_OK とだけ返して
+```
+
+> **注意:** `HEARTBEAT.md` が存在しない場合、デフォルトのプロンプトのみで実行されます。
+> ヘッダー行や空行のみのファイルは「実質的に空」とみなし、API コール削減のためスキップします。
+
+**動作確認:**
+
+以下のログが出ていれば正常に起動しています。
+
+```
+Heartbeat scheduler started (interval=1800s)
+HEARTBEAT_OK (suppressed)
+```
+
+エージェントが報告すべき内容を返した場合は `Heartbeat alert (len=N)` がログに出力されます。
 
 ### Discord 連携
 

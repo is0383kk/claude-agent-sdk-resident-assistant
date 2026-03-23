@@ -33,6 +33,7 @@
 | Cron REST API               | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` 等 |
 | Discord 集成                | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
 | Slack 集成                  | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
+| Heartbeat                   | 通过 `openclaude config set heartbeat.every 30m` 定期轮询   |
 
 ---
 
@@ -151,6 +152,57 @@ openclaude cron edit <job-id> --enable
 # 删除任务
 openclaude cron delete <job-id>
 ```
+
+### Heartbeat
+
+在主会话中定期执行智能体轮次，处理 `~/.openclaude/HEARTBEAT.md` 中的检查清单。
+与 Cron 不同，Heartbeat 在执行时保留主会话的对话上下文。
+若智能体仅回复 `HEARTBEAT_OK`，则抑制通知（仅记录日志）。
+
+**配置步骤：**
+
+```bash
+# 启用 Heartbeat（每30分钟执行一次）
+openclaude config set heartbeat.every 30m
+
+# 禁用 Heartbeat
+openclaude config set heartbeat.every 0m
+
+# 保留间隔设置的同时临时暂停
+openclaude config set heartbeat.disabled true
+
+# 设置活跃时间段（仅在 09:00〜22:00 之间执行）
+openclaude config set heartbeat.active_hours.start "09:00"
+openclaude config set heartbeat.active_hours.end "22:00"
+
+# 重启守护进程以应用配置
+openclaude restart
+```
+
+**HEARTBEAT.md：**
+
+在 `~/.openclaude/HEARTBEAT.md` 中编写供智能体处理的检查清单：
+
+```markdown
+# Heartbeat 检查清单
+
+- 检查是否有紧急的待处理任务
+- 如果没有需要关注的事项，请仅回复 HEARTBEAT_OK
+```
+
+> **注意：** 若 `HEARTBEAT.md` 不存在，守护进程将仅使用默认提示词执行。
+> 若文件仅包含标题行或空行，则视为"实质上为空"并跳过执行，以减少 API 调用。
+
+**验证运行：**
+
+日志中出现以下信息则表示正常启动：
+
+```
+Heartbeat scheduler started (interval=1800s)
+HEARTBEAT_OK (suppressed)
+```
+
+若智能体有需要报告的内容，日志中将显示 `Heartbeat alert (len=N)`。
 
 ### Discord 集成
 
