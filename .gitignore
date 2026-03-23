@@ -31,3 +31,7 @@ NOTE.txt
 CLAUDE.md
 drawio.json
 config.local.json
+spec/slack-integration-spec.md
+spec/spec-cron-edit.md
+spec/spec-cron-runs.md
+spec/SPEC-HEARTBEAT.md
