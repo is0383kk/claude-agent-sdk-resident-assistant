@@ -1,10 +1,15 @@
-"""Cron 管理コマンド - cron add / list / delete / run。"""
+"""Cron 管理コマンド - cron add / list / delete / run / runs。"""
 
+import json
+import logging
 import sys
+from datetime import datetime
 
 _CRAB = "🦀"
+_logger = logging.getLogger(__name__)
 
 try:
+    from ..config import CRON_JOBS_FILE, CRON_RUNS_DIR
     from ..process import get_daemon_status
     from ..utils import daemon_request
 except ImportError:
@@ -14,6 +19,7 @@ except ImportError:
     _pkg_root = str(_Path(__file__).parent.parent.parent)
     if _pkg_root not in _sys.path:
         _sys.path.insert(0, _pkg_root)
+    from src.config import CRON_JOBS_FILE, CRON_RUNS_DIR
     from src.process import get_daemon_status
     from src.utils import daemon_request
 
@@ -83,7 +89,7 @@ async def cmd_cron_list() -> None:
         msg_preview = j["message"][:40] + ("..." if len(j["message"]) > 40 else "")
         row = (
             f"{j['id']:<{col_id}}  {j['name']:<{col_name}}  {j['schedule']:<{col_sched}}  "
-            f"{j['session_id']:<{col_session}}  {enabled_str:<7}  {(j.get('last_run_status') or '-'):<{col_status}}  {msg_preview}"
+            f"{j['session_id']:<{col_session}}  {enabled_str:<7}  {(j.get('last_run_status') or '-'):<{col_status}}  {msg_preview}"  # noqa: E501
         )
         print(row)
 
@@ -122,6 +128,88 @@ async def cmd_cron_run(job_id: str) -> None:
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def _read_run_log(job_id: str) -> list[dict]:
+    """CRON_RUNS_DIR/<job_id>.jsonl の全レコードを返す（古い順）。"""
+    log_path = CRON_RUNS_DIR / f"{job_id}.jsonl"
+    if not log_path.exists():
+        return []
+    records = []
+    for line in log_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError as e:
+                _logger.warning("_read_run_log: skipping malformed line in %s: %s", job_id, e)
+                continue
+    return records
+
+
+async def cmd_cron_runs(job_id: str | None, limit: int) -> None:
+    """Cron ジョブの実行履歴を表示する。daemon 経由不要（ファイル直読み）。"""
+    if job_id is not None:
+        # --- 特定ジョブの詳細履歴 ---
+        try:
+            data = json.loads(CRON_JOBS_FILE.read_text(encoding="utf-8")) if CRON_JOBS_FILE.exists() else []
+        except Exception:
+            data = []
+        known_ids = {j["id"] for j in data if isinstance(j, dict)}
+        if known_ids and job_id not in known_ids:
+            print(f"Job not found: {job_id}", file=sys.stderr)
+            sys.exit(1)
+
+        records = _read_run_log(job_id)
+        total = len(records)
+        display = list(reversed(records))[:limit]
+
+        print(f"Cron Job Runs: {job_id}\n")
+        if not display:
+            print(f"No run history for job: {job_id}")
+            return
+
+        print(f"Showing last {len(display)} runs (total: {total})\n")
+        print(f"  {'#':<3} {'started_at':<25} {'finished_at':<25} {'duration':<10} status")
+        for i, r in enumerate(display, 1):
+            try:
+                st = datetime.fromisoformat(r["started_at"])
+                ft = datetime.fromisoformat(r["finished_at"])
+                duration = f"{(ft - st).total_seconds():.1f}s"
+            except Exception:
+                duration = "-"
+            status = r.get("status", "-")
+            try:
+                started_disp = st.strftime("%Y-%m-%dT%H:%M:%S%z")
+                finished_disp = ft.strftime("%Y-%m-%dT%H:%M:%S%z")
+            except Exception:
+                started_disp = r.get("started_at", "")
+                finished_disp = r.get("finished_at", "")
+            print(f"  {i:<3} {started_disp:<25} {finished_disp:<25} {duration:<10} {status}")
+            if status == "error" and r.get("error"):
+                print(f"    Error: {r['error']}")
+    else:
+        # --- 全ジョブのサマリー ---
+        try:
+            data = json.loads(CRON_JOBS_FILE.read_text(encoding="utf-8")) if CRON_JOBS_FILE.exists() else []
+        except Exception:
+            data = []
+        if not data:
+            print("No cron jobs registered.")
+            return
+
+        print("Cron Job Run Summary\n")
+        col_id = max(max((len(j.get("id", "")) for j in data), default=0), 8)
+        col_name = max(max((len(j.get("name", "")) for j in data), default=0), 12)
+        print(f"{'job-id':<{col_id}}  {'name':<{col_name}}  {'last run':<32} {'status':<8} runs")
+        for j in data:
+            jid = j.get("id", "")
+            records = _read_run_log(jid)
+            run_count = len(records)
+            last = records[-1] if records else None
+            last_run = last.get("finished_at", "-") if last else "(never)"
+            last_status = last.get("status", "-") if last else "-"
+            print(f"{jid:<{col_id}}  {j.get('name', ''):<{col_name}}  {last_run:<32} {last_status:<8} {run_count}")
 
 
 async def cmd_cron_edit(

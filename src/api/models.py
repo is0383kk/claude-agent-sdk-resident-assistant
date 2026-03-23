@@ -1,7 +1,7 @@
 """OpenClaude API - Pydantic リクエスト/レスポンスモデル定義。"""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 try:
     from ..config import DEFAULT_SESSION_ID
@@ -112,3 +112,22 @@ class CronListResponse(BaseModel):
 
     jobs: list[CronJobResponse]
     total: int
+
+
+class CronRunRecord(BaseModel):
+    """Cron ジョブの1実行レコード。"""
+
+    job_id: str
+    started_at: str
+    finished_at: str
+    status: str
+    error: str | None = None
+
+
+class CronRunsResponse(BaseModel):
+    """GET /cron/{job_id}/runs のレスポンスボディ。"""
+
+    job_id: str
+    runs: list[CronRunRecord]
+    total: int
+    limit: int
