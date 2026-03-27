@@ -1,6 +1,3 @@
-> [!WARNING]
-> This repository is under development. The source code and documentation are incomplete.
-
 <table>
 	<thead>
     	<tr>
