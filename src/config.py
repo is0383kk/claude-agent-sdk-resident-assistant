@@ -1,15 +1,15 @@
-"""OpenClaude configuration constants."""
+"""casra configuration constants."""
 
 import logging
 import sys
 from pathlib import Path
 
-# ユーザーディレクトリ以下の .openclaude ディレクトリをベースに各種ファイルパスを定義
-BASE_DIR: Path = Path.home() / ".openclaude"
+# ユーザーディレクトリ以下の .casra ディレクトリをベースに各種ファイルパスを定義
+BASE_DIR: Path = Path.home() / ".casra"
 
 # デーモン関連のファイルパス
-SOCKET_PATH: Path = BASE_DIR / "openclaude.sock"
-PID_FILE: Path = BASE_DIR / "openclaude.pid"
+SOCKET_PATH: Path = BASE_DIR / "casra.sock"
+PID_FILE: Path = BASE_DIR / "casra.pid"
 DAEMON_LOG: Path = BASE_DIR / "daemon.log"
 
 # セッションデータ保存用ディレクトリ／ファイル／デフォルトセッションID

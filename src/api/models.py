@@ -1,4 +1,4 @@
-"""OpenClaude API - Pydantic リクエスト/レスポンスモデル定義。"""
+"""Casra API - Pydantic リクエスト/レスポンスモデル定義。"""
 
 import sys
 from pathlib import Path

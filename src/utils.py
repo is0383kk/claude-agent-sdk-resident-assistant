@@ -1,4 +1,4 @@
-"""OpenClaude 共通ユーティリティ関数。"""
+"""Casra 共通ユーティリティ関数。"""
 
 import asyncio
 import json

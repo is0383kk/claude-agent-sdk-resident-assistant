@@ -1,3 +1,3 @@
-"""OpenClaude - Resident AI Agent System"""
+"""Casra - Resident AI Agent System"""
 
 __version__ = "0.1.0"

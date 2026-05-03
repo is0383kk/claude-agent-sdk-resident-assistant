@@ -43,7 +43,7 @@ async def cmd_sessions() -> None:
     """デーモンからセッション一覧を取得して表示する。"""
     sessions = await fetch_sessions()
 
-    print(f"{_CRAB} OpenClaude\n")
+    print(f"{_CRAB} Casra\n")
 
     if not sessions:
         print("Sessions: 0")
@@ -67,7 +67,7 @@ async def cmd_sessions() -> None:
 async def cmd_sessions_cleanup() -> None:
     """全セッションをクリーンアップする。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:
@@ -88,7 +88,7 @@ async def cmd_sessions_cleanup() -> None:
 async def cmd_sessions_delete(session_id: str) -> None:
     """指定したセッションを削除する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:

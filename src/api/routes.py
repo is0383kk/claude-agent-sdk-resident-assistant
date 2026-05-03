@@ -1,4 +1,4 @@
-"""OpenClaude API - FastAPI エンドポイント定義とヘルパー関数。"""
+"""Casra API - FastAPI エンドポイント定義とヘルパー関数。"""
 
 import asyncio
 import json
@@ -58,7 +58,7 @@ except ImportError:
 # FastAPI アプリ
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="OpenClaude API", version="0.1.0")
+app = FastAPI(title="Casra API", version="0.1.0")
 
 # ---------------------------------------------------------------------------
 # ヘルパー

@@ -1,7 +1,7 @@
 [project]
-name = "openclaude"
+name = "casra"
 version = "0.1.0"
-description = "OpenClaude:A Claude Code-based OpenClaw-like resident AI agent"
+description = "casra: Claude Agent SDK Resident Assistant"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

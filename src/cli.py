@@ -1,19 +1,19 @@
-"""OpenClaude CLI - コマンド引数の解析と実行。
+"""casra CLI - コマンド引数の解析と実行。
 
 コマンド一覧:
-    openclaude start [--port PORT]
-    openclaude stop
-    openclaude restart [--port PORT]
-    openclaude status
-    openclaude logs [--tail N]
-    openclaude sessions
-    openclaude sessions cleanup
-    openclaude sessions delete SESSION_ID
-    openclaude [--session-id ID] --message TEXT
-    openclaude [--session-id ID] -m TEXT
-    echo "質問" | openclaude
-    openclaude < file.txt
-    cat file.txt | openclaude -m "これを要約して"
+    casra start [--port PORT]
+    casra stop
+    casra restart [--port PORT]
+    casra status
+    casra logs [--tail N]
+    casra sessions
+    casra sessions cleanup
+    casra sessions delete SESSION_ID
+    casra [--session-id ID] --message TEXT
+    casra [--session-id ID] -m TEXT
+    echo "質問" | casra
+    casra < file.txt
+    cat file.txt | casra -m "これを要約して"
 """
 
 import argparse
@@ -65,7 +65,7 @@ except ImportError:
 
 def main() -> None:
     """CLI のエントリーポイント。"""
-    cli = OpenClaudeCLI()
+    cli = CasraCLI()
     cli.run()
 
 
@@ -74,7 +74,7 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 
 
-class OpenClaudeCLI:
+class CasraCLI:
     """コマンドライン引数を解析してデーモン操作とメッセージ送信を行うクラス。"""
 
     def run(self) -> None:  # noqa: C901
@@ -138,13 +138,13 @@ class OpenClaudeCLI:
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
-            prog="openclaude",
-            description="OpenClaude - Resident AI Agent System",
+            prog="casra",
+            description="casra - Resident AI Agent System",
         )
 
         subparsers = parser.add_subparsers(dest="command")
         _default_port = config_get_nested(load_config(), "default.port") or DEFAULT_PORT
-        start_parser = subparsers.add_parser("start", help="Start the OpenClaude daemon")
+        start_parser = subparsers.add_parser("start", help="Start the Casra daemon")
         start_parser.add_argument(
             "--port",
             type=int,
@@ -152,8 +152,8 @@ class OpenClaudeCLI:
             metavar="PORT",
             help=f"Port for the API server (default: {_default_port})",
         )
-        subparsers.add_parser("stop", help="Stop the OpenClaude daemon")
-        restart_parser = subparsers.add_parser("restart", help="Restart the OpenClaude daemon")
+        subparsers.add_parser("stop", help="Stop the Casra daemon")
+        restart_parser = subparsers.add_parser("restart", help="Restart the Casra daemon")
         restart_parser.add_argument(
             "--port",
             type=int,

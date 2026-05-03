@@ -1,9 +1,9 @@
-"""OpenClaude API パッケージ。
+"""casra API パッケージ。
 
 `from src.api import app` で FastAPI アプリインスタンスを取得できる。
 
 スタンドアロン起動:
-    python3 -m src.api          (~/.openclaude/ から)
+    python3 -m src.api          (~/.casra/ から)
     python3 -m src.api --port 8080
 """
 
@@ -35,7 +35,7 @@ async def _main(port: int) -> None:
 
     setup_logging()
     WEBHOOK_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
-    _logger.info("OpenClaude API server starting on port %d (PID: %d)", port, os.getpid())
+    _logger.info("casra API server starting on port %d (PID: %d)", port, os.getpid())
 
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104
     server = uvicorn.Server(config)
@@ -43,11 +43,11 @@ async def _main(port: int) -> None:
         await server.serve()
     finally:
         WEBHOOK_PID_FILE.unlink(missing_ok=True)
-        _logger.info("OpenClaude API server stopped.")
+        _logger.info("casra API server stopped.")
 
 
 if __name__ == "__main__":
-    _parser = argparse.ArgumentParser(description="OpenClaude API Server")
+    _parser = argparse.ArgumentParser(description="Casra API Server")
     _parser.add_argument("--port", type=int, default=DEFAULT_PORT, metavar="PORT")
     _args = _parser.parse_args()
     asyncio.run(_main(_args.port))

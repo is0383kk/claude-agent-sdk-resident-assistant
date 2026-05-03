@@ -1,29 +1,29 @@
-# OpenClaude systemd user service
+# casra systemd user service
 #
 # Install:
 #   mkdir -p ~/.config/systemd/user
-#   cp openclaude.service ~/.config/systemd/user/
+#   cp casra.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
-#   systemctl --user enable openclaude.service
-#   systemctl --user start openclaude.service
+#   systemctl --user enable casra.service
+#   systemctl --user start casra.service
 #
 # Note: Adjust ExecStart to match the Python that has claude-agent-sdk installed.
 #   Check with: python3 -c "import claude_agent_sdk; print('ok')"
 #   If using pyenv: ExecStart=/home/is0383kk/.pyenv/shims/python3 -m src.daemon
 
 [Unit]
-Description=OpenClaude Resident AI Agent Daemon
+Description=casra Resident AI Agent Daemon
 After=default.target
 
 [Service]
 Type=simple
 ExecStart=python3 -m src.daemon
-WorkingDirectory=/home/is0383kk/.openclaude
+WorkingDirectory=/home/is0383kk/.casra
 Restart=on-failure
 RestartSec=5
 KillMode=process
-StandardOutput=append:/home/is0383kk/.openclaude/daemon.log
-StandardError=append:/home/is0383kk/.openclaude/daemon.log
+StandardOutput=append:/home/is0383kk/.casra/daemon.log
+StandardError=append:/home/is0383kk/.casra/daemon.log
 
 [Install]
 WantedBy=default.target

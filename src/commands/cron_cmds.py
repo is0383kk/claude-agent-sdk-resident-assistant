@@ -32,7 +32,7 @@ def _is_daemon_up() -> bool:
 async def cmd_cron_add(schedule: str, name: str | None, session: str, message: str) -> None:
     """Cron ジョブを追加する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:
@@ -55,7 +55,7 @@ async def cmd_cron_add(schedule: str, name: str | None, session: str, message: s
 async def cmd_cron_list() -> None:
     """Cron ジョブ一覧を表示する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:
@@ -68,7 +68,7 @@ async def cmd_cron_list() -> None:
         sys.exit(1)
 
     jobs = response.get("jobs", [])
-    print(f"{_CRAB} OpenClaude Cron Jobs\n")
+    print(f"{_CRAB} Casra Cron Jobs\n")
     if not jobs:
         print("No cron jobs registered.")
         return
@@ -97,7 +97,7 @@ async def cmd_cron_list() -> None:
 async def cmd_cron_delete(job_id: str) -> None:
     """Cron ジョブを削除する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:
@@ -115,7 +115,7 @@ async def cmd_cron_delete(job_id: str) -> None:
 async def cmd_cron_run(job_id: str) -> None:
     """Cron ジョブを手動で即時実行する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     try:
@@ -222,7 +222,7 @@ async def cmd_cron_edit(
 ) -> None:
     """Cron ジョブのフィールドを部分更新する。"""
     if not _is_daemon_up():
-        print("OpenClaude daemon is not running.")
+        print("Casra daemon is not running.")
         return
 
     patch: dict = {}

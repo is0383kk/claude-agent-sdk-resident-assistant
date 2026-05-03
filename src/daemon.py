@@ -1,4 +1,4 @@
-"""OpenClaude デーモン - asyncio Unix ソケットサーバー。
+"""Casra デーモン - asyncio Unix ソケットサーバー。
 
 セッション管理を行い、claude-agent-sdk へのリクエストをプロキシする。
 プロセス管理・起動エントリーポイントは src/process.py を参照。
@@ -33,7 +33,7 @@ except ImportError:
     from src.stream import handle_assistant_message, handle_result_message, handle_stream_event, send_json
 
 
-class OpenClaudeDaemon:
+class CasraDaemon:
     """Unix ソケットサーバーとして動作する常駐デーモン。"""
 
     def __init__(self) -> None:
@@ -58,7 +58,7 @@ class OpenClaudeDaemon:
 
         await self._cron.start()
         await self._heartbeat.start()
-        _logger.info("OpenClaude daemon started (PID: %d)", os.getpid())
+        _logger.info("Casra daemon started (PID: %d)", os.getpid())
 
         async with self._server:
             await self._shutdown_event.wait()
@@ -67,7 +67,7 @@ class OpenClaudeDaemon:
         await self._heartbeat.stop()
         SOCKET_PATH.unlink(missing_ok=True)
         PID_FILE.unlink(missing_ok=True)
-        _logger.info("OpenClaude daemon stopped.")
+        _logger.info("Casra daemon stopped.")
 
     # ------------------------------------------------------------------
     # クライアントハンドラー

@@ -8,7 +8,7 @@
   	</thead>
 </table>
 
-# 🦀OpenClaude — Claude Code-native personal AI assistant
+# 🦀Casra — Claude Code-native personal AI assistant
 
 `claude-agent-sdk` を使った常駐型 AI エージェントシステム。Claude Codeの`settings.json`をベースに動作します。  
 このプロジェクトは [OpenClaw](https://github.com/openclaw/openclaw) に触発されたプロジェクトです。  
@@ -20,17 +20,17 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 
 | 機能                                 | コマンド / エンドポイント                                   |
 | ------------------------------------ | ----------------------------------------------------------- |
-| デーモン起動・停止・再起動・状態確認 | `openclaude start/stop/restart/status`                      |
-| メッセージ送信（ストリーミング）     | `openclaude -m "メッセージ"`                                |
-| stdin / パイプ入力                   | `echo "質問" \| openclaude`                                 |
-| ログ表示                             | `openclaude logs [--tail N]`                                |
-| セッション管理                       | `openclaude sessions`                                       |
-| Cron ジョブ管理                      | `openclaude cron add/list/delete/run/edit`                  |
+| デーモン起動・停止・再起動・状態確認 | `casra start/stop/restart/status`                      |
+| メッセージ送信（ストリーミング）     | `casra -m "メッセージ"`                                |
+| stdin / パイプ入力                   | `echo "質問" \| casra`                                 |
+| ログ表示                             | `casra logs [--tail N]`                                |
+| セッション管理                       | `casra sessions`                                       |
+| Cron ジョブ管理                      | `casra cron add/list/delete/run/edit`                  |
 | HTTP REST API                        | `POST /message`, `POST /message/stream`, `GET /status` など |
 | Cron REST API                        | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` など |
-| Discord 連携                         | デーモン起動時に自動接続（`openclaude config set` で設定）  |
-| Slack 連携                           | デーモン起動時に自動接続（`openclaude config set` で設定）  |
-| Heartbeat                            | `openclaude config set heartbeat.every 30m` で定期ポーリング |
+| Discord 連携                         | デーモン起動時に自動接続（`casra config set` で設定）  |
+| Slack 連携                           | デーモン起動時に自動接続（`casra config set` で設定）  |
+| Heartbeat                            | `casra config set heartbeat.every 30m` で定期ポーリング |
 
 ---
 
@@ -56,21 +56,21 @@ Unix ソケットサーバーとして常駐し、CLI・REST API からメッセ
 ### インストール
 
 ```bash
-git clone <repository-url> ~/.openclaude
-cd ~/.openclaude
+git clone <repository-url> ~/.casra
+cd ~/.casra
 pip install -r requirements.txt
 
 # PATH に追加（~/.bashrc に追記）
-echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+echo '[ -d "$HOME/.casra" ] && export PATH="$HOME/.casra:$PATH"' >> ~/.bashrc
 
 # タブ補完を有効化（~/.bashrc に追記）
-echo 'eval "$(register-python-argcomplete openclaude)"' >> ~/.bashrc
+echo 'eval "$(register-python-argcomplete casra)"' >> ~/.bashrc
 
 source ~/.bashrc
 ```
 
-> **注意:** プロジェクトは必ず `~/.openclaude/` に配置してください。
-> `src/config.py` が `Path.home() / ".openclaude"` をベースパスとして使用するため、別ディレクトリでは動作しません。
+> **注意:** プロジェクトは必ず `~/.casra/` に配置してください。
+> `src/config.py` が `Path.home() / ".casra"` をベースパスとして使用するため、別ディレクトリでは動作しません。
 
 ---
 
@@ -80,79 +80,79 @@ source ~/.bashrc
 
 ```bash
 # 起動（デフォルトポート: 28789）
-openclaude start
+casra start
 
 # ポートを指定して起動
-openclaude start --port 18789
+casra start --port 18789
 
 # 停止
-openclaude stop
+casra stop
 
 # 再起動
-openclaude restart
+casra restart
 
 # 状態確認
-openclaude status
+casra status
 
 # ログ表示
-openclaude logs           # 全内容
-openclaude logs --tail 50 # 末尾50行
+casra logs           # 全内容
+casra logs --tail 50 # 末尾50行
 ```
 
 ### メッセージ送信
 
 ```bash
 # シンプルな送信
-openclaude -m "プロンプト"
+casra -m "プロンプト"
 
 # セッションを指定
-openclaude --session-id work -m "プロンプト"
+casra --session-id work -m "プロンプト"
 
 # stdin / パイプ
-echo "質問" | openclaude
-cat report.txt | openclaude -m "これを要約して"
-git diff | openclaude -m "このdiffをレビューして"
+echo "質問" | casra
+cat report.txt | casra -m "これを要約して"
+git diff | casra -m "このdiffをレビューして"
 ```
 
 ### セッション管理
 
 ```bash
 # 一覧表示
-openclaude sessions
+casra sessions
 
 # 全セッション削除
-openclaude sessions cleanup
+casra sessions cleanup
 
 # 特定セッション削除
-openclaude sessions delete <session-id>
+casra sessions delete <session-id>
 ```
 
 ### Cron ジョブ
 
 ```bash
 # ジョブ追加（毎朝9時に実行）
-openclaude cron add "0 9 * * *" --name "morning" --session main -m "今日のタスクを整理して"
+casra cron add "0 9 * * *" --name "morning" --session main -m "今日のタスクを整理して"
 
 # 一覧表示
-openclaude cron list
+casra cron list
 
 # 手動実行
-openclaude cron run <job-id>
+casra cron run <job-id>
 
 # ジョブを編集（フィールドを個別に変更可能）
-openclaude cron edit <job-id> --name "新しい名前"
-openclaude cron edit <job-id> --schedule "0 10 * * *" --message "更新したプロンプト"
-openclaude cron edit <job-id> --session work
-openclaude cron edit <job-id> --disable
-openclaude cron edit <job-id> --enable
+casra cron edit <job-id> --name "新しい名前"
+casra cron edit <job-id> --schedule "0 10 * * *" --message "更新したプロンプト"
+casra cron edit <job-id> --session work
+casra cron edit <job-id> --disable
+casra cron edit <job-id> --enable
 
 # 削除
-openclaude cron delete <job-id>
+casra cron delete <job-id>
 ```
 
 ### Heartbeat
 
-メインセッションで定期的にエージェントターンを実行し、`~/.openclaude/HEARTBEAT.md` のチェックリストを処理します。
+メインセッションで定期的にエージェントターンを実行し、`~/.casra/HEARTBEAT.md` のチェックリストを処理します。
 Cron と異なり、メインセッションの会話コンテキストを保持したまま実行されます。
 エージェントが `HEARTBEAT_OK` とだけ返した場合は通知を抑制し、ログのみで完了します。
 
@@ -160,25 +160,25 @@ Cron と異なり、メインセッションの会話コンテキストを保持
 
 ```bash
 # Heartbeat を有効化（30分間隔）
-openclaude config set heartbeat.every 30m
+casra config set heartbeat.every 30m
 
 # Heartbeat を無効化
-openclaude config set heartbeat.every 0m
+casra config set heartbeat.every 0m
 
 # 間隔設定を保持したまま一時停止
-openclaude config set heartbeat.disabled true
+casra config set heartbeat.disabled true
 
 # アクティブ時間帯を設定（09:00〜22:00 の間のみ実行）
-openclaude config set heartbeat.active_hours.start "09:00"
-openclaude config set heartbeat.active_hours.end "22:00"
+casra config set heartbeat.active_hours.start "09:00"
+casra config set heartbeat.active_hours.end "22:00"
 
 # デーモンを再起動して反映
-openclaude restart
+casra restart
 ```
 
 **HEARTBEAT.md:**
 
-`~/.openclaude/HEARTBEAT.md` にエージェントへのチェックリストを記述します。
+`~/.casra/HEARTBEAT.md` にエージェントへのチェックリストを記述します。
 
 ```markdown
 # Heartbeat チェックリスト
@@ -215,16 +215,16 @@ Discord Bot を接続して、指定チャンネルのメッセージを受信�
 
 ```bash
 # Bot Token を設定（必須）
-openclaude config set discord.bot_token <YOUR_BOT_TOKEN>
+casra config set discord.bot_token <YOUR_BOT_TOKEN>
 
 # 対象チャンネル ID を設定（必須 — チャンネルを右クリック → チャンネル ID をコピー）
-openclaude config set discord.channel_id <YOUR_CHANNEL_ID>
+casra config set discord.channel_id <YOUR_CHANNEL_ID>
 
 # 使用するセッションを変更する場合（デフォルト: "discord"）
-openclaude config set discord.session_id discord2
+casra config set discord.session_id discord2
 
 # デーモンを再起動して反映
-openclaude restart
+casra restart
 ```
 
 > **注意:** `discord.channel_id` が未設定の場合、Bot は起動しません（WARNING ログが出ます）。
@@ -257,16 +257,16 @@ Slack Bot を接続して、DM・チャンネルメンションを Socket Mode �
 
 ```bash
 # Bot Token を設定（必須、xoxb- 始まり）
-openclaude config set slack.bot_token <YOUR_BOT_TOKEN>
+casra config set slack.bot_token <YOUR_BOT_TOKEN>
 
 # App Token を設定（必須、xapp- 始まり）
-openclaude config set slack.app_token <YOUR_APP_TOKEN>
+casra config set slack.app_token <YOUR_APP_TOKEN>
 
 # 使用するセッションを変更する場合（デフォルト: "slack"）
-openclaude config set slack.session_id slack2
+casra config set slack.session_id slack2
 
 # デーモンを再起動して反映
-openclaude restart
+casra restart
 ```
 
 > **注意:** `slack.bot_token` と `slack.app_token` の両方が設定されている場合のみ Bot が起動します。
@@ -276,12 +276,12 @@ openclaude restart
 
 ```bash
 # DM を特定ユーザーに限定する（デフォルト: "open" — 全員許可）
-openclaude config set slack.dm_policy allowlist
-openclaude config set slack.allow_from '["U01234567", "U09876543"]'
+casra config set slack.dm_policy allowlist
+casra config set slack.allow_from '["U01234567", "U09876543"]'
 
 # チャンネルメンションを特定チャンネルに限定する（デフォルト: "open" — 全チャンネル許可）
-openclaude config set slack.channel_policy allowlist
-openclaude config set slack.channels '["C01234567"]'
+casra config set slack.channel_policy allowlist
+casra config set slack.channels '["C01234567"]'
 ```
 
 **動作確認:**
@@ -298,9 +298,9 @@ Slack bot ready (logged in as <BotName>, team=<TeamName>)
 ### systemd 連携（セットアップ済みの場合）
 
 ```bash
-systemctl --user start openclaude
-systemctl --user stop openclaude
-systemctl --user status openclaude
+systemctl --user start casra
+systemctl --user stop casra
+systemctl --user status casra
 ```
 
 ---

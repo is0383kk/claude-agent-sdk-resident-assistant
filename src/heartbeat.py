@@ -1,4 +1,4 @@
-"""OpenClaude Heartbeat スケジューラ - 定期ポーリング。
+"""Casra Heartbeat スケジューラ - 定期ポーリング。
 
 config.json の heartbeat.every 設定に従い、定期的にメインセッションで
 エージェントターンを実行して HEARTBEAT.md のチェックリストを処理する。

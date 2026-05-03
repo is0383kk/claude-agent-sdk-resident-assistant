@@ -59,7 +59,7 @@ async def _read_json(reader: asyncio.StreamReader) -> dict[str, Any]:
 async def cmd_message(session_id: str, message: str) -> None:
     """エージェントにメッセージを送信してレスポンスをストリーミング表示する。"""
     if not _is_daemon_up():
-        print("Starting OpenClaude daemon...")
+        print("Starting Casra daemon...")
         _cfg_port = config_get_nested(load_config(), "default.port") or DEFAULT_PORT
         start_daemon_process(_cfg_port)
         for _ in range(150):
@@ -80,7 +80,7 @@ async def cmd_message(session_id: str, message: str) -> None:
         sys.exit(1)
 
     try:
-        print(f"{_CRAB} OpenClaude（{session_id}）")
+        print(f"{_CRAB} Casra（{session_id}）")
         print("│")
         print("◇")
 

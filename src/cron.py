@@ -1,4 +1,4 @@
-"""OpenClaude Cron スケジューラ - apscheduler による定期ジョブ管理。
+"""Casra Cron スケジューラ - apscheduler による定期ジョブ管理。
 
 CronJob データクラスとスケジューラを提供する。
 ジョブ定義は jobs.json に永続化され、デーモン再起動後も自動復元される。

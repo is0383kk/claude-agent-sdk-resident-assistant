@@ -8,7 +8,7 @@
     </thead>
 </table>
 
-# 🦀OpenClaude — Claude Code-native personal AI assistant
+# 🦀Casra — Claude Code-native personal AI assistant
 
 基于 `claude-agent-sdk` 构建的持久化 AI 智能体系统。以 Claude Code 的 `settings.json` 为基础运行  
 本项目受 [OpenClaw](https://github.com/openclaw/openclaw) 启发而创建  
@@ -20,17 +20,17 @@
 
 | 功能                        | 命令 / 端点                                                 |
 | --------------------------- | ----------------------------------------------------------- |
-| 守护进程启动/停止/重启/状态 | `openclaude start/stop/restart/status`                      |
-| 发送消息（流式传输）        | `openclaude -m "消息"`                                      |
-| stdin / 管道输入            | `echo "问题" \| openclaude`                                 |
-| 查看日志                    | `openclaude logs [--tail N]`                                |
-| 会话管理                    | `openclaude sessions`                                       |
-| Cron 任务管理               | `openclaude cron add/list/delete/run/edit`                  |
+| 守护进程启动/停止/重启/状态 | `casra start/stop/restart/status`                      |
+| 发送消息（流式传输）        | `casra -m "消息"`                                      |
+| stdin / 管道输入            | `echo "问题" \| casra`                                 |
+| 查看日志                    | `casra logs [--tail N]`                                |
+| 会话管理                    | `casra sessions`                                       |
+| Cron 任务管理               | `casra cron add/list/delete/run/edit`                  |
 | HTTP REST API               | `POST /message`, `POST /message/stream`, `GET /status` 等   |
 | Cron REST API               | `GET /cron`, `POST /cron`, `PATCH /cron/{id}`, `DELETE /cron/{id}` 等 |
-| Discord 集成                | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
-| Slack 集成                  | 守护进程启动时自动连接（通过 `openclaude config set` 配置） |
-| Heartbeat                   | 通过 `openclaude config set heartbeat.every 30m` 定期轮询   |
+| Discord 集成                | 守护进程启动时自动连接（通过 `casra config set` 配置） |
+| Slack 集成                  | 守护进程启动时自动连接（通过 `casra config set` 配置） |
+| Heartbeat                   | 通过 `casra config set heartbeat.every 30m` 定期轮询   |
 
 ---
 
@@ -56,21 +56,21 @@
 ### 安装步骤
 
 ```bash
-git clone <repository-url> ~/.openclaude
-cd ~/.openclaude
+git clone <repository-url> ~/.casra
+cd ~/.casra
 pip install -r requirements.txt
 
 # 添加至 PATH（追加至 ~/.bashrc）
-echo '[ -d "$HOME/.openclaude" ] && export PATH="$HOME/.openclaude:$PATH"' >> ~/.bashrc
+echo '[ -d "$HOME/.casra" ] && export PATH="$HOME/.casra:$PATH"' >> ~/.bashrc
 
 # 启用 Tab 补全（追加至 ~/.bashrc）
-echo 'eval "$(register-python-argcomplete openclaude)"' >> ~/.bashrc
+echo 'eval "$(register-python-argcomplete casra)"' >> ~/.bashrc
 
 source ~/.bashrc
 ```
 
-> **注意：** 项目必须放置在 `~/.openclaude/` 目录下。
-> 由于 `src/config.py` 使用 `Path.home() / ".openclaude"` 作为基础路径，放在其他目录将无法正常运行。
+> **注意：** 项目必须放置在 `~/.casra/` 目录下。
+> 由于 `src/config.py` 使用 `Path.home() / ".casra"` 作为基础路径，放在其他目录将无法正常运行。
 
 ---
 
@@ -80,79 +80,79 @@ source ~/.bashrc
 
 ```bash
 # 启动（默认端口：28789）
-openclaude start
+casra start
 
 # 指定端口启动
-openclaude start --port 18789
+casra start --port 18789
 
 # 停止
-openclaude stop
+casra stop
 
 # 重启
-openclaude restart
+casra restart
 
 # 查看状态
-openclaude status
+casra status
 
 # 查看日志
-openclaude logs           # 全部内容
-openclaude logs --tail 50 # 最后50行
+casra logs           # 全部内容
+casra logs --tail 50 # 最后50行
 ```
 
 ### 发送消息
 
 ```bash
 # 简单发送
-openclaude -m "提示词"
+casra -m "提示词"
 
 # 指定会话
-openclaude --session-id work -m "提示词"
+casra --session-id work -m "提示词"
 
 # stdin / 管道
-echo "问题" | openclaude
-cat report.txt | openclaude -m "请总结这份内容"
-git diff | openclaude -m "请审查这个diff"
+echo "问题" | casra
+cat report.txt | casra -m "请总结这份内容"
+git diff | casra -m "请审查这个diff"
 ```
 
 ### 会话管理
 
 ```bash
 # 列出会话
-openclaude sessions
+casra sessions
 
 # 删除所有会话
-openclaude sessions cleanup
+casra sessions cleanup
 
 # 删除指定会话
-openclaude sessions delete <session-id>
+casra sessions delete <session-id>
 ```
 
 ### Cron 任务
 
 ```bash
 # 添加任务（每天早上9点执行）
-openclaude cron add "0 9 * * *" --name "morning" --session main -m "整理今天的任务"
+casra cron add "0 9 * * *" --name "morning" --session main -m "整理今天的任务"
 
 # 列出任务
-openclaude cron list
+casra cron list
 
 # 手动执行
-openclaude cron run <job-id>
+casra cron run <job-id>
 
 # 编辑任务（可单独修改各字段）
-openclaude cron edit <job-id> --name "新名称"
-openclaude cron edit <job-id> --schedule "0 10 * * *" --message "更新后的提示词"
-openclaude cron edit <job-id> --session work
-openclaude cron edit <job-id> --disable
-openclaude cron edit <job-id> --enable
+casra cron edit <job-id> --name "新名称"
+casra cron edit <job-id> --schedule "0 10 * * *" --message "更新后的提示词"
+casra cron edit <job-id> --session work
+casra cron edit <job-id> --disable
+casra cron edit <job-id> --enable
 
 # 删除任务
-openclaude cron delete <job-id>
+casra cron delete <job-id>
 ```
 
 ### Heartbeat
 
-在主会话中定期执行智能体轮次，处理 `~/.openclaude/HEARTBEAT.md` 中的检查清单。
+在主会话中定期执行智能体轮次，处理 `~/.casra/HEARTBEAT.md` 中的检查清单。
 与 Cron 不同，Heartbeat 在执行时保留主会话的对话上下文。
 若智能体仅回复 `HEARTBEAT_OK`，则抑制通知（仅记录日志）。
 
@@ -160,25 +160,25 @@ openclaude cron delete <job-id>
 
 ```bash
 # 启用 Heartbeat（每30分钟执行一次）
-openclaude config set heartbeat.every 30m
+casra config set heartbeat.every 30m
 
 # 禁用 Heartbeat
-openclaude config set heartbeat.every 0m
+casra config set heartbeat.every 0m
 
 # 保留间隔设置的同时临时暂停
-openclaude config set heartbeat.disabled true
+casra config set heartbeat.disabled true
 
 # 设置活跃时间段（仅在 09:00〜22:00 之间执行）
-openclaude config set heartbeat.active_hours.start "09:00"
-openclaude config set heartbeat.active_hours.end "22:00"
+casra config set heartbeat.active_hours.start "09:00"
+casra config set heartbeat.active_hours.end "22:00"
 
 # 重启守护进程以应用配置
-openclaude restart
+casra restart
 ```
 
 **HEARTBEAT.md：**
 
-在 `~/.openclaude/HEARTBEAT.md` 中编写供智能体处理的检查清单：
+在 `~/.casra/HEARTBEAT.md` 中编写供智能体处理的检查清单：
 
 ```markdown
 # Heartbeat 检查清单
@@ -215,16 +215,16 @@ HEARTBEAT_OK (suppressed)
 
 ```bash
 # 设置 Bot Token（必填）
-openclaude config set discord.bot_token <YOUR_BOT_TOKEN>
+casra config set discord.bot_token <YOUR_BOT_TOKEN>
 
 # 设置目标频道 ID（必填 — 右键点击频道 → 复制频道 ID）
-openclaude config set discord.channel_id <YOUR_CHANNEL_ID>
+casra config set discord.channel_id <YOUR_CHANNEL_ID>
 
 # 更改使用的会话（可选，默认值："discord"）
-openclaude config set discord.session_id discord2
+casra config set discord.session_id discord2
 
 # 重启守护进程以应用配置
-openclaude restart
+casra restart
 ```
 
 > **注意：** 若未设置 `discord.channel_id`，Bot 将不会启动（日志中会输出 WARNING）。
@@ -257,16 +257,16 @@ Discord bot ready (logged in as <BotName>)
 
 ```bash
 # 设置 Bot Token（必填，xoxb- 前缀）
-openclaude config set slack.bot_token <YOUR_BOT_TOKEN>
+casra config set slack.bot_token <YOUR_BOT_TOKEN>
 
 # 设置 App Token（必填，xapp- 前缀）
-openclaude config set slack.app_token <YOUR_APP_TOKEN>
+casra config set slack.app_token <YOUR_APP_TOKEN>
 
 # 更改使用的会话（可选，默认值："slack"）
-openclaude config set slack.session_id slack2
+casra config set slack.session_id slack2
 
 # 重启守护进程以应用配置
-openclaude restart
+casra restart
 ```
 
 > **注意：** 必须同时设置 `slack.bot_token` 和 `slack.app_token`，Bot 才会启动。
@@ -276,12 +276,12 @@ openclaude restart
 
 ```bash
 # 限制私信仅接受特定用户（默认："open" — 允许所有人）
-openclaude config set slack.dm_policy allowlist
-openclaude config set slack.allow_from '["U01234567", "U09876543"]'
+casra config set slack.dm_policy allowlist
+casra config set slack.allow_from '["U01234567", "U09876543"]'
 
 # 限制频道提及仅响应特定频道（默认："open" — 允许所有频道）
-openclaude config set slack.channel_policy allowlist
-openclaude config set slack.channels '["C01234567"]'
+casra config set slack.channel_policy allowlist
+casra config set slack.channels '["C01234567"]'
 ```
 
 **验证运行：**
@@ -298,9 +298,9 @@ Slack bot ready (logged in as <BotName>, team=<TeamName>)
 ### systemd 集成（已配置的情况下）
 
 ```bash
-systemctl --user start openclaude
-systemctl --user stop openclaude
-systemctl --user status openclaude
+systemctl --user start casra
+systemctl --user stop casra
+systemctl --user status casra
 ```
 
 ---

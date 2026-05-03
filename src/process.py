@@ -1,4 +1,4 @@
-"""OpenClaude プロセス管理 - デーモンの起動・停止・状態確認とエントリーポイント。
+"""Casra プロセス管理 - デーモンの起動・停止・状態確認とエントリーポイント。
 
 cli.py から使用される関数群と、`python -m src.process` で起動するエントリーポイントを提供する。
 """
@@ -127,9 +127,9 @@ async def _main(port: int) -> None:
         from .api import app as api_app  # noqa: PLC0415
     except ImportError as e:
         _logger.warning("API server disabled (fastapi/uvicorn not installed): %s", e)
-        from .daemon import OpenClaudeDaemon  # noqa: PLC0415
+        from .daemon import CasraDaemon  # noqa: PLC0415
 
-        daemon = OpenClaudeDaemon()
+        daemon = CasraDaemon()
         await daemon.start()
         return
 
@@ -137,11 +137,11 @@ async def _main(port: int) -> None:
         def install_signal_handlers(self) -> None:
             pass  # daemon 側のシグナルハンドラーを維持するため何もしない
 
-    from .daemon import OpenClaudeDaemon  # noqa: PLC0415
+    from .daemon import CasraDaemon  # noqa: PLC0415
     from .discord_bot import create_discord_bot  # noqa: PLC0415
     from .slack_bot import create_slack_bot  # noqa: PLC0415
 
-    daemon = OpenClaudeDaemon()
+    daemon = CasraDaemon()
     api_config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104
     api_server = _NoSignalServer(api_config)
     discord_bot = create_discord_bot()
@@ -155,7 +155,7 @@ async def _main(port: int) -> None:
             await slack_bot.stop()
         api_server.should_exit = True
 
-    _logger.info("OpenClaude API server will start on port %d", port)
+    _logger.info("Casra API server will start on port %d", port)
     coros: list[Any] = [_run_daemon(), api_server.serve()]
     if discord_bot is not None:
         coros.append(discord_bot.start())
@@ -165,7 +165,7 @@ async def _main(port: int) -> None:
 
 
 if __name__ == "__main__":
-    _parser = argparse.ArgumentParser(description="OpenClaude Daemon")
+    _parser = argparse.ArgumentParser(description="Casra Daemon")
     _parser.add_argument("--port", type=int, default=DEFAULT_PORT, metavar="PORT")
     _args = _parser.parse_args()
     asyncio.run(_main(_args.port))
